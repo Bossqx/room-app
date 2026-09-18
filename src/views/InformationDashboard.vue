@@ -65,13 +65,18 @@ onUnmounted(() => {
 <style scoped>
 /* Date + time — full-width top-left row spanning both columns */
 .dash-clock {
-  flex: 0 0 100%;
+  grid-column: 1;
   width: 100%;
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.1rem;
-  padding: 0 0.5rem 0.75rem;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 0.8rem;
+  min-height: 2.65rem;
+  padding: 0.42rem 0.75rem;
+  border: 1px solid #e1e0d9;
+  border-radius: 0.75rem;
+  background: #fcfcfb;
+  box-sizing: border-box;
   font-family:
     system-ui,
     -apple-system,
@@ -99,39 +104,44 @@ html[data-theme="dark"] .clock-date {
 html[data-theme="dark"] .clock-time {
   color: #ffffff;
 }
+html[data-theme="dark"] .dash-clock {
+  background: #1a1a19;
+  border-color: #2c2c2a;
+}
 
 .dashboard-split {
-  display: flex;
-  /* lets .dash-clock take a full-width row above the two columns */
-  flex-wrap: wrap;
-  align-items: stretch;
+  display: grid;
+  grid-template-columns: minmax(0, 70%) minmax(20rem, 30%);
+  grid-template-rows: auto auto;
+  align-items: start;
+  column-gap: 0;
+  row-gap: 0.65rem;
   width: 100%;
   min-height: calc(100vh - 4rem);
-  /* cancel the layout's own .container padding so this page can use its own, larger padding */
-  margin: -1rem -2rem -1.5rem;
-  padding-top: 1rem;
-  padding-right: 0.5rem;
-  padding-bottom: 0.1rem;
-  padding-left: 0.5rem;
+  margin: 0;
+  padding: 0.75rem 1rem 0.5rem;
   box-sizing: border-box;
   background: #f5f6f8;
+  overflow-x: hidden;
 }
 
 .dashboard-col-left {
-  width: 70%;
-  flex-shrink: 0;
+  grid-column: 1;
+  grid-row: 2;
+  min-width: 0;
 }
 
 .dashboard-col-right {
-  width: 30%;
-  flex-shrink: 0;
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  min-width: 0;
   box-sizing: border-box;
   align-self: flex-start;
   height: calc(100vh - 8rem);
   min-height: 28rem;
   max-height: calc(100vh - 8rem);
   overflow: hidden;
-  padding-top: 1rem;
+  padding-top: 0;
   padding-right: 1.1rem;
   padding-bottom: 1.1rem;
   padding-left: 1.1rem;
@@ -156,16 +166,22 @@ html[data-theme="dark"] .clock-time {
 
 @media (max-width: 960px) {
   .dashboard-split {
-    flex-direction: column;
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto;
+    padding: 0.75rem;
   }
   .dash-clock {
-    flex: 0 0 auto;
+    grid-column: 1;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.1rem;
   }
   .dashboard-col-left,
   .dashboard-col-right {
-    width: 100%;
+    grid-column: 1;
   }
   .dashboard-col-right {
+    grid-row: 3;
     height: auto;
     min-height: 0;
     max-height: none;

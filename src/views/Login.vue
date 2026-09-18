@@ -4,7 +4,8 @@ import { useRouter } from 'vue-router'
 import { useUserStore } from '../stores/user'
 import { useSemesterStore } from '../stores/semester'
 import config from "../assets/config.json"
-import logo from "../assets/Logo C.jpg"
+
+const logo = '/icons/icon-192.svg'
 
 const router         = useRouter()
 const userStore      = useUserStore()

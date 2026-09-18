@@ -6,7 +6,8 @@ import config from "../assets/config.json"
 import Booking from '../views/components/BookingDesktop.vue'
 import ChangePinDesktop from '../views/components/ChangePinDesktop.vue'
 import ThemeToggle from '../views/components/ThemeToggle.vue'
-import logo from '../assets/Logo C.jpg'
+
+const logo = '/icons/icon-192.svg'
 
 const router    = useRouter()
 const route     = useRoute()

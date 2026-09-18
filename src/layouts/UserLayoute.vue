@@ -4,7 +4,8 @@ import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '../stores/user'
 import config from "../assets/config.json"
 import ThemeToggle from '../views/components/ThemeToggle.vue'
-import logo from '../assets/Logo C.jpg'
+
+const logo = '/icons/icon-192.svg'
 
 const router    = useRouter()
 const route     = useRoute()

@@ -17,7 +17,7 @@ export default defineConfig({
     vue(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['icons/icon-192.png', 'icons/icon-512.png'],
+      includeAssets: ['icons/icon-192.svg', 'icons/icon-512.svg'],
       manifest: {
         name: 'Room Manager 27',
         short_name: 'Room27',
@@ -27,14 +27,14 @@ export default defineConfig({
         display: 'standalone',
         icons: [
           {
-            src: '/icons/icon-192.png',
+            src: '/icons/icon-192.svg',
             sizes: '192x192',
-            type: 'image/png',
+            type: 'image/svg+xml',
           },
           {
-            src: '/icons/icon-512.png',
+            src: '/icons/icon-512.svg',
             sizes: '512x512',
-            type: 'image/png',
+            type: 'image/svg+xml',
           },
         ],
       },

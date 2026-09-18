@@ -26,7 +26,6 @@ import ScheduleInfo from "../views/ScheduleInfo.vue";
 import InformationDashboard from "../views/InformationDashboard.vue";
 import InformationMobile from "../views/InformationMobile.vue";
 import RoomAdmin from "../views/RoomAdmin.vue";
-import FirstDashboard from "../views/First.vue";
 import AdminCancelRoom from "../views/AdminCancelRoom.vue";
 
 const router = createRouter({
@@ -54,7 +53,7 @@ const router = createRouter({
         {
           path: "dashboard-first",
           name: "dashboard-first",
-          component: FirstDashboard,
+          component: InformationDashboard,
         },
       ],
     },

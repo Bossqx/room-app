@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
 import ThemeToggle from '../views/components/ThemeToggle.vue'
-import logo from '../assets/Logo C.jpg'
+
+const logo = '/icons/icon-192.svg'
 
 const router = useRouter()
 
