@@ -106,12 +106,10 @@ html[data-theme="dark"] .clock-time {
   flex-wrap: wrap;
   align-items: stretch;
   width: 100%;
-  min-height: 100vh;
+  min-height: calc(100vh - 4rem);
   /* cancel the layout's own .container padding so this page can use its own, larger padding */
   margin: -1rem -2rem -1.5rem;
-  /* Top padding sits at 10rem on viewports taller than 80rem (~1040px), then
-     grows 1rem for every 1rem of height lost below that, capped at 50rem. */
-  padding-top: clamp(10rem, calc(80rem - 100vh), 50rem);
+  padding-top: 1rem;
   padding-right: 0.5rem;
   padding-bottom: 0.1rem;
   padding-left: 0.5rem;
@@ -128,7 +126,12 @@ html[data-theme="dark"] .clock-time {
   width: 30%;
   flex-shrink: 0;
   box-sizing: border-box;
-   padding-top: 1rem;
+  align-self: flex-start;
+  height: calc(100vh - 8rem);
+  min-height: 28rem;
+  max-height: calc(100vh - 8rem);
+  overflow: hidden;
+  padding-top: 1rem;
   padding-right: 1.1rem;
   padding-bottom: 1.1rem;
   padding-left: 1.1rem;
@@ -163,6 +166,10 @@ html[data-theme="dark"] .clock-time {
     width: 100%;
   }
   .dashboard-col-right {
+    height: auto;
+    min-height: 0;
+    max-height: none;
+    overflow: visible;
     padding: 1.5rem 0 0;
   }
 }

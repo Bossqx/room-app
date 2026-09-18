@@ -46,7 +46,7 @@ onUnmounted(() => {
 
 <template>
   <div class="dashboard-container">
-    <div class="dashboard-split" :class="{ 'has-room-details': selectedRoomNo }">
+    <div class="dashboard-split">
       <header class="dash-clock">
         <span class="clock-date">{{ dateLabel }}</span>
         <span class="clock-time">{{ timeLabel }}</span>
@@ -60,6 +60,9 @@ onUnmounted(() => {
           :room-no="selectedRoomNo"
           @close="closeRoom"
         />
+        <div v-else class="placeholder-panel">
+          <p class="placeholder-text">Select a room to view details</p>
+        </div>
       </div>
     </div>
   </div>
@@ -122,9 +125,9 @@ html[data-theme="dark"] .dash-clock {
 
 .dashboard-split {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: auto minmax(0, 1fr);
-  align-items: stretch;
+  grid-template-columns: minmax(0, 70%) minmax(20rem, 30%);
+  grid-template-rows: auto auto;
+  align-items: start;
   gap: 0.65rem;
   width: 100%;
   min-height: calc(100vh - 4.5rem);
@@ -134,23 +137,36 @@ html[data-theme="dark"] .dash-clock {
   background: #f5f6f8;
 }
 
-.dashboard-split.has-room-details {
-  grid-template-columns: minmax(0, 70%) minmax(20rem, 30%);
-}
-
 .dashboard-col-left {
   min-width: 0;
 }
 
 .dashboard-col-right {
-  display: none;
   min-width: 0;
   box-sizing: border-box;
   padding: 0 0.1rem 1.1rem;
+  height: calc(100vh - 8rem);
+  min-height: 28rem;
+  max-height: calc(100vh - 8rem);
+  overflow: hidden;
 }
 
-.has-room-details .dashboard-col-right {
-  display: block;
+.placeholder-panel {
+  height: 100%;
+  min-height: 200px;
+  background: #fcfcfb;
+  border: 1px solid #e1e0d9;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.placeholder-text {
+  color: #898781;
+  font-size: 0.85rem;
+  margin: 0;
 }
 
 @media (max-width: 960px) {
@@ -169,6 +185,10 @@ html[data-theme="dark"] .dash-clock {
   .dashboard-col-left,
   .dashboard-col-right {
     width: auto;
+    height: auto;
+    min-height: 0;
+    max-height: none;
+    overflow: visible;
   }
 }
 </style>

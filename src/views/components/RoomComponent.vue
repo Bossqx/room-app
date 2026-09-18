@@ -77,6 +77,55 @@ const orderedSchedules = computed(() =>
   [...schedules.value].sort((a, b) => a.startTime.localeCompare(b.startTime)),
 );
 
+function pickString(source: Record<string, unknown>, keys: string[]): string | null {
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+    if (typeof value === "number") return String(value);
+  }
+  return null;
+}
+
+function pickNumber(source: Record<string, unknown>, keys: string[]): number | null {
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === "number") return value;
+    if (typeof value === "string" && value.trim() && !Number.isNaN(Number(value))) return Number(value);
+  }
+  return null;
+}
+
+function normalizeRoom(raw: unknown): Room | null {
+  if (!raw || typeof raw !== "object") return null;
+  const source = raw as Record<string, unknown>;
+  const roomNo = pickString(source, ["room_no", "roomNo", "room_code", "roomCode", "roomcode"]);
+  if (!roomNo) return null;
+
+  return {
+    id: pickNumber(source, ["id"]) ?? undefined,
+    room_no: roomNo,
+    panorama: pickString(source, ["panorama"]),
+    room_type: pickString(source, ["room_type", "roomType", "type"]),
+    floor_no: pickNumber(source, ["floor_no", "floorNo", "floor"]),
+    building: pickString(source, ["building", "building_name", "buildingName"]),
+    computer_no: pickNumber(source, ["computer_no", "computerNo", "computers", "computer_count"]),
+    seat_no: pickNumber(source, ["seat_no", "seatNo", "seats", "seat_count"]),
+  };
+}
+
+function normalizeRoomList(payload: unknown): Room[] {
+  const rows = Array.isArray(payload)
+    ? payload
+    : payload && typeof payload === "object" && Array.isArray((payload as { data?: unknown }).data)
+      ? (payload as { data: unknown[] }).data
+      : [];
+  return rows.map(normalizeRoom).filter((item): item is Room => item !== null);
+}
+
+function sameRoom(a: string, b: string): boolean {
+  return a.trim().toLowerCase() === b.trim().toLowerCase();
+}
+
 function itemLabel(item: FeatureItem): string {
   return (item.application ?? item.accessory ?? item.code ?? "").trim();
 }
@@ -93,14 +142,15 @@ async function loadRoomDetails() {
 
   state.value = "loading";
   errorMsg.value = "";
-  room.value = null;
+  room.value = { room_no: props.roomNo };
   applications.value = [];
   accessories.value = [];
   schedules.value = [];
 
   try {
-    const rooms = await fetchJson<Room[]>(`${apiBase}/room/get_all_rooms`, []);
-    room.value = rooms.find((item) => item.room_no === props.roomNo) ?? {
+    const roomsPayload = await fetchJson<unknown>(`${apiBase}/room/get_all_rooms`, []);
+    const rooms = normalizeRoomList(roomsPayload);
+    room.value = rooms.find((item) => sameRoom(item.room_no, props.roomNo)) ?? {
       room_no: props.roomNo,
     };
 
@@ -210,13 +260,17 @@ watch(() => props.roomNo, loadRoomDetails);
 
 <style scoped>
 .room-panel {
-  min-height: 100%;
+  height: 100%;
+  min-height: 0;
   background: #fcfcfb;
   border: 1px solid #e1e0d9;
   border-radius: 8px;
   padding: 1rem;
   color: #191816;
   box-shadow: 0 14px 36px rgb(20 20 20 / 0.08);
+  box-sizing: border-box;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .room-header,
