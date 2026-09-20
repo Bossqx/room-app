@@ -611,20 +611,8 @@ onUnmounted(() => {
 
 <template>
   <div class="page">
-  
-
-    <div class="view-toggle">
-      <button type="button" class="btn-mode" :class="{ active: viewMode === 'room' }" @click="setViewMode('room')">
-        Room View
-      </button>
-      <button type="button" class="btn-mode" :class="{ active: viewMode === 'full' }" @click="setViewMode('full')">
-        Full Calendar
-      </button>
-    </div>
-
     <div class="anchor-row">
       <button
-        v-if="viewMode === 'room'"
         type="button"
         class="btn-week-nav"
         aria-label="Previous week"
@@ -684,7 +672,6 @@ onUnmounted(() => {
       </div>
 
       <button
-        v-if="viewMode === 'room'"
         type="button"
         class="btn-week-nav"
         aria-label="Next week"
@@ -695,6 +682,15 @@ onUnmounted(() => {
           <path stroke-linecap="round" stroke-linejoin="round" d="M9 18l6-6-6-6" />
         </svg>
       </button>
+
+      <div class="view-toggle" aria-label="Schedule view">
+        <button type="button" class="btn-mode" :class="{ active: viewMode === 'room' }" @click="setViewMode('room')">
+          Room View
+        </button>
+        <button type="button" class="btn-mode" :class="{ active: viewMode === 'full' }" @click="setViewMode('full')">
+          Full Calendar
+        </button>
+      </div>
     </div>
 
     <div v-if="viewMode === 'room' && state === 'error'" class="msg error-box">{{ errMsg }}</div>
@@ -805,21 +801,6 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <!-- Full calendar — all rooms, week agenda -->
-    <div v-if="viewMode === 'full'" class="week-nav">
-      <button type="button" class="btn-week-nav" aria-label="Previous week" title="Previous week" @click="shiftWeek(-7)">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M15 18l-6-6 6-6" />
-        </svg>
-      </button>
-      <span class="week-nav-label">{{ weekDates[0] }} – {{ weekDates[6] }}</span>
-      <button type="button" class="btn-week-nav" aria-label="Next week" title="Next week" @click="shiftWeek(7)">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M9 18l6-6-6-6" />
-        </svg>
-      </button>
-    </div>
-
     <div v-if="viewMode === 'full' && fullState === 'error'" class="msg error-box">{{ fullErrMsg }}</div>
 
     <div v-if="viewMode === 'full' && fullState === 'loading'" class="msg muted">Loading full calendar…</div>
@@ -903,11 +884,11 @@ onUnmounted(() => {
   background: var(--bg-page);
   color: var(--text-primary);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  padding: 4.5rem 1% 1.25rem;
+  padding: 4.25rem 1% 0.75rem;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  overflow-y: auto;
+  gap: 0.5rem;
+  overflow: hidden;
   box-sizing: border-box;
   z-index: 10;
 }
@@ -1001,7 +982,8 @@ onUnmounted(() => {
   border: 1px solid var(--border);
   border-radius: 0.5rem;
   color: var(--text-primary);
-  padding: 0.55rem 1rem;
+  min-height: 34px;
+  padding: 0.4rem 0.85rem;
   font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
@@ -1012,14 +994,16 @@ onUnmounted(() => {
 .view-toggle {
   display: flex;
   gap: 0.4rem;
-  align-self: flex-start;
+  align-items: center;
+  margin-left: 0.25rem;
 }
 .btn-mode {
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: 999px;
   color: var(--text-secondary);
-  padding: 0.4rem 0.9rem;
+  min-height: 34px;
+  padding: 0.35rem 0.8rem;
   font-size: 0.78rem;
   font-weight: 600;
   cursor: pointer;
@@ -1074,8 +1058,10 @@ onUnmounted(() => {
 }
 
 .table-scroll {
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: hidden;
   flex: 1;
+  min-height: 0;
 }
 
 /* ── Full calendar — all rooms, week agenda ── */
@@ -1092,8 +1078,8 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: 999px;
@@ -1252,7 +1238,16 @@ onUnmounted(() => {
 .grid {
   border-collapse: collapse;
   width: 100%;
+  height: 100%;
   table-layout: fixed;
+}
+
+.grid thead {
+  height: 48px;
+}
+
+.grid tbody tr {
+  height: calc((100% - 48px) / 7);
 }
 
 .day-head,
@@ -1287,7 +1282,7 @@ onUnmounted(() => {
   padding: 0.4rem 0.5rem;
   vertical-align: top;
   min-width: 90px;
-  height: 110px;
+  height: auto;
 }
 
 .period-cell.filled {
@@ -1432,7 +1427,7 @@ onUnmounted(() => {
   justify-content: center;
   width: 100%;
   height: 100%;
-  min-height: 40px;
+  min-height: 32px;
   background: transparent;
   border: 1px dashed var(--border);
   border-radius: 0.35rem;
@@ -1460,6 +1455,35 @@ onUnmounted(() => {
 }
 .cancel-msg-cell.ok   { background: var(--pill-success-bg); color: var(--pill-success-text); border: 1px solid #22c55e; }
 .cancel-msg-cell.fail { background: var(--pill-error-bg); color: var(--pill-error-text); border: 1px solid #ef4444; }
+
+@media (max-height: 820px) {
+  .page {
+    padding-top: 4rem;
+    padding-bottom: 0.5rem;
+    gap: 0.35rem;
+  }
+
+  .grid thead {
+    height: 42px;
+  }
+
+  .grid tbody tr {
+    height: calc((100% - 42px) / 7);
+  }
+
+  .day-head,
+  .period-head,
+  .day-cell,
+  .period-cell {
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+  }
+
+  .course-name,
+  .course-teacher {
+    line-height: 1.15;
+  }
+}
 
 /* ── Confirm class popup ── */
 .confirm-overlay {

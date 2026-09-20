@@ -108,6 +108,15 @@ const now = ref(new Date());
 const imageFailed = ref(false);
 const lastUpdatedAt = ref<Date | null>(null);
 const dayButtonRefs = new Map<string, HTMLButtonElement>();
+const weekdays = [
+  { short: "อา", full: "อาทิตย์" },
+  { short: "จ", full: "จันทร์" },
+  { short: "อ", full: "อังคาร" },
+  { short: "พ", full: "พุธ" },
+  { short: "พฤ", full: "พฤหัสบดี" },
+  { short: "ศ", full: "ศุกร์" },
+  { short: "ส", full: "เสาร์" },
+];
 let clockTimer: ReturnType<typeof setInterval> | null = null;
 let dashboardRefreshTimer: ReturnType<typeof setInterval> | null = null;
 let personCountStream: EventSource | null = null;
@@ -440,6 +449,10 @@ function selectDate(date: string) {
   visibleMonth.value = date.slice(0, 7);
 }
 
+function selectToday() {
+  selectDate(localDateKey(new Date()));
+}
+
 async function moveSelectedDate(delta: number) {
   const [year, month, day] = selectedDate.value.split("-").map(Number);
   const next = new Date(year, month - 1, day);
@@ -511,6 +524,7 @@ watch(selectedRoomCode, (roomCode) => {
 });
 
 onMounted(() => {
+  selectToday();
   loadCoreData();
   subscribePersonCount();
   clockTimer = setInterval(() => { now.value = new Date(); }, 1000);
@@ -673,30 +687,50 @@ onUnmounted(() => {
     <section class="lower-grid" aria-label="ปฏิทินและตารางการใช้ห้อง">
       <section class="calendar-panel" aria-labelledby="calendar-title">
         <header class="calendar-heading">
-          <div>
-            <h2 id="calendar-title">ปฏิทินการใช้ห้อง <span>{{ selectedRoomCode || "ทุกห้อง" }}</span></h2>
-            <p>{{ monthLabel }}</p>
+          <div class="calendar-title-group">
+            <span class="calendar-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M7 3v3M17 3v3M4 8h16M5 5h14a1 1 0 0 1 1 1v14H4V6a1 1 0 0 1 1-1Z" /><path d="m9 14 2 2 4-4" /></svg>
+            </span>
+            <div>
+              <h2 id="calendar-title">ปฏิทินการใช้ห้อง <span>{{ selectedRoomCode || "ทุกห้อง" }}</span></h2>
+              <p>{{ monthLabel }}</p>
+            </div>
           </div>
           <div class="calendar-controls" aria-label="ควบคุมเดือนที่แสดง">
-            <button type="button" aria-label="เดือนก่อนหน้า" @click="visibleMonth = addMonths(visibleMonth, -1)">
+            <button type="button" aria-label="เดือนก่อนหน้า" title="เดือนก่อนหน้า" @click="visibleMonth = addMonths(visibleMonth, -1)">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
             </button>
-            <button type="button" class="today-button" @click="selectDate(localDateKey(new Date()))">วันนี้</button>
-            <button type="button" aria-label="เดือนถัดไป" @click="visibleMonth = addMonths(visibleMonth, 1)">
+            <button type="button" class="today-button" @click="selectToday">วันนี้</button>
+            <button type="button" aria-label="เดือนถัดไป" title="เดือนถัดไป" @click="visibleMonth = addMonths(visibleMonth, 1)">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
             </button>
           </div>
         </header>
         <p class="sr-only" aria-live="polite">วันที่เลือก {{ selectedDateLabel }} มี {{ selectedDaySchedules.length }} รายการ</p>
         <div class="calendar-grid" :aria-label="`ปฏิทิน ${monthLabel} ${selectedRoomCode ? `ห้อง ${selectedRoomCode}` : 'ทุกห้อง'}`">
-          <span v-for="weekday in ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส']" :key="weekday" class="weekday">{{ weekday }}</span>
+          <span
+            v-for="(weekday, index) in weekdays"
+            :key="weekday.full"
+            class="weekday"
+            :class="{ sunday: index === 0, saturday: index === 6 }"
+          >
+            <b>{{ weekday.short }}</b>
+            <small>{{ weekday.full }}</small>
+          </span>
           <button
-            v-for="day in calendarDays"
+            v-for="(day, index) in calendarDays"
             :key="day.date"
             :ref="(element) => setDayRef(day.date, element as Element | null)"
             type="button"
             class="day-cell"
-            :class="{ muted: !day.currentMonth, today: day.isToday, selected: day.isSelected, 'has-events': day.events.length }"
+            :class="{
+              muted: !day.currentMonth,
+              today: day.isToday,
+              selected: day.isSelected,
+              'has-events': day.events.length,
+              sunday: index % 7 === 0,
+              saturday: index % 7 === 6,
+            }"
             :aria-pressed="day.isSelected"
             :aria-current="day.isToday ? 'date' : undefined"
             :aria-label="calendarDayLabel(day)"
@@ -752,7 +786,7 @@ onUnmounted(() => {
   --dt-gray: #5f6f82;
   --dt-panel-shadow: 0 2px 10px rgb(15 23 42 / 0.07);
   display: grid;
-  grid-template-rows: minmax(0, 66%) minmax(0, 34%);
+  grid-template-rows: minmax(0, 58%) minmax(0, 42%);
   gap: 0.46rem;
   width: 100%;
   height: calc(100dvh - 3.1rem);
@@ -786,8 +820,8 @@ onUnmounted(() => {
   gap: 0.46rem;
 }
 
-.overview-grid { grid-template-columns: minmax(0, 67fr) minmax(19rem, 33fr); }
-.lower-grid { grid-template-columns: minmax(0, 69fr) minmax(18rem, 31fr); }
+.overview-grid,
+.lower-grid { grid-template-columns: minmax(0, 67fr) minmax(19rem, 33fr); }
 .overview-main { display: grid; grid-template-rows: auto auto minmax(0, 1fr); gap: 0.4rem; min-width: 0; min-height: 0; }
 
 .time-strip,
@@ -936,24 +970,37 @@ onUnmounted(() => {
 
 .calendar-panel,
 .schedule-panel { min-width: 0; min-height: 0; padding: 0.5rem 0.58rem; overflow: hidden; }
+.calendar-panel { padding: 0.65rem 0.72rem 0.72rem; border-radius: 16px; }
 .calendar-heading,
 .schedule-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.6rem; margin-bottom: 0.24rem; }
+.calendar-heading { align-items: center; margin-bottom: 0.55rem; }
+.calendar-title-group { display: flex; align-items: center; gap: 0.62rem; min-width: 0; }
+.calendar-title-group > div { min-width: 0; }
+.calendar-icon { display: inline-flex; align-items: center; justify-content: center; width: 2.45rem; height: 2.45rem; flex: 0 0 auto; border-radius: 11px; background: var(--dt-blue-soft); color: var(--dt-blue); }
+.calendar-icon svg { width: 1.45rem; height: 1.45rem; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.calendar-heading h2 { font-size: 1.02rem; }
 .calendar-heading h2 span { color: var(--dt-blue); }
 .calendar-controls { display: flex; align-items: center; gap: 0.28rem; }
-.calendar-controls button { display: inline-flex; align-items: center; justify-content: center; width: 1.65rem; height: 1.65rem; border: 1px solid var(--dt-border); border-radius: 6px; background: var(--dt-surface-alt); color: var(--dt-text); font: inherit; cursor: pointer; }
-.calendar-controls .today-button { width: auto; padding-inline: 0.48rem; font-size: 0.66rem; font-weight: 700; }
-.calendar-controls svg { width: 0.9rem; height: 0.9rem; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); grid-template-rows: auto repeat(6, minmax(1.25rem, 1fr)); gap: 0.12rem; height: calc(100% - 2.35rem); min-height: 0; }
-.weekday { align-self: center; padding-block: 0.1rem; color: var(--dt-soft); font-size: 0.68rem; font-weight: 700; text-align: center; }
-.day-cell { position: relative; min-width: 0; min-height: 0; border: 1px solid var(--dt-border); border-radius: 6px; background: var(--dt-surface); color: var(--dt-text); font: inherit; font-size: 0.72rem; cursor: pointer; }
-.day-cell:hover { border-color: color-mix(in srgb, var(--dt-blue) 55%, var(--dt-border)); background: var(--dt-surface-alt); }
-.day-cell.muted { color: var(--dt-soft); }
-.day-cell.today { color: var(--dt-blue); font-weight: 800; }
-.day-cell.selected { border-color: var(--dt-blue); background: var(--dt-blue-soft); color: #fff; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--dt-blue) 28%, transparent); }
-.day-cell.selected > span:first-child { display: inline-flex; align-items: center; justify-content: center; width: 1.45rem; height: 1.45rem; border-radius: 50%; background: var(--dt-blue); color: #fff; }
+.calendar-controls button { display: inline-flex; align-items: center; justify-content: center; width: 2rem; height: 2rem; border: 1px solid var(--dt-border); border-radius: 9px; background: var(--dt-surface); color: var(--dt-text); font: inherit; cursor: pointer; transition: border-color 140ms ease-out, background-color 140ms ease-out; }
+.calendar-controls button:hover { border-color: color-mix(in srgb, var(--dt-blue) 48%, var(--dt-border)); background: var(--dt-blue-soft); }
+.calendar-controls .today-button { width: auto; padding-inline: 0.68rem; background: var(--dt-blue-soft); color: var(--dt-blue); font-size: 0.72rem; font-weight: 800; }
+.calendar-controls svg { width: 1rem; height: 1rem; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); grid-template-rows: minmax(2.1rem, auto) repeat(6, minmax(1.55rem, 1fr)); gap: 0.28rem; height: calc(100% - 3.25rem); min-height: 0; }
+.weekday { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 0; padding: 0.24rem 0.15rem; border-radius: 10px; background: var(--dt-blue-soft); color: var(--dt-text); text-align: center; }
+.weekday b { font-size: 0.76rem; line-height: 1; }
+.weekday small { margin-top: 0.16rem; font-size: 0.6rem; line-height: 1; font-weight: 650; }
+.weekday.sunday { background: var(--dt-red-soft); color: var(--dt-red); }
+.weekday.saturday { background: var(--dt-green-soft); color: var(--dt-green); }
+.day-cell { position: relative; display: flex; align-items: center; justify-content: center; min-width: 0; min-height: 0; border: 1px solid var(--dt-border); border-radius: 10px; background: var(--dt-surface); color: var(--dt-text); font: inherit; font-size: 0.86rem; font-weight: 700; font-variant-numeric: tabular-nums; cursor: pointer; transition: border-color 140ms ease-out, background-color 140ms ease-out, transform 140ms ease-out; }
+.day-cell:hover { border-color: color-mix(in srgb, var(--dt-blue) 55%, var(--dt-border)); background: var(--dt-blue-soft); transform: translateY(-1px); }
+.day-cell.muted { color: var(--dt-soft); opacity: 0.5; }
+.day-cell.sunday:not(.selected):not(.muted) { color: var(--dt-red); }
+.day-cell.saturday:not(.selected):not(.muted) { color: var(--dt-green); }
+.day-cell.today:not(.selected) { border-color: color-mix(in srgb, var(--dt-blue) 56%, var(--dt-border)); color: var(--dt-blue); font-weight: 850; }
+.day-cell.selected { border-color: var(--dt-blue); background: var(--dt-blue); color: #fff; box-shadow: 0 3px 9px rgb(37 99 235 / 0.24); }
 :global(:root[data-theme="dark"]) .day-cell.selected { color: #fff; }
-.day-cell.has-events:not(.selected) { border-color: color-mix(in srgb, var(--dt-amber) 36%, var(--dt-border)); }
-.day-cell i { position: absolute; right: 0.3rem; bottom: 0.18rem; min-width: 0.38rem; width: 0.38rem; height: 0.38rem; border-radius: 50%; background: var(--dt-amber); color: transparent; font-size: 0; font-style: normal; line-height: 0; }
+.day-cell i { position: absolute; right: 0.36rem; bottom: 0.28rem; min-width: 0.38rem; width: 0.38rem; height: 0.38rem; border-radius: 50%; background: var(--dt-amber); color: transparent; font-size: 0; font-style: normal; line-height: 0; }
+.day-cell.selected i { background: #fff; }
 
 .schedule-heading > span { padding: 0.24rem 0.42rem; border-radius: 999px; background: var(--dt-blue-soft); color: var(--dt-blue); font-size: 0.6rem; font-weight: 750; white-space: nowrap; }
 .schedule-list { display: flex; flex-direction: column; gap: 0.22rem; max-height: calc(100% - 2.35rem); margin: 0; padding: 0; overflow-y: auto; list-style: none; scrollbar-width: thin; }
@@ -976,9 +1023,14 @@ onUnmounted(() => {
   .dashboard-test-page { min-height: 0; }
 }
 
+@media (min-width: 1200px) and (min-height: 850px) {
+  .calendar-grid { grid-template-rows: minmax(2.6rem, auto) repeat(6, minmax(2.15rem, 1fr)); }
+}
+
 @media (max-width: 1199px) {
   .dashboard-test-page { height: auto; min-height: calc(100dvh - 3.1rem); overflow: visible; grid-template-rows: auto auto; }
-  .overview-grid { grid-template-columns: minmax(0, 62fr) minmax(18rem, 38fr); }
+  .overview-grid,
+  .lower-grid { grid-template-columns: minmax(0, 62fr) minmax(18rem, 38fr); }
   .overview-main { min-height: 31rem; }
   .room-detail-panel { max-height: 31rem; }
   .lower-grid { min-height: 18rem; }
@@ -989,7 +1041,7 @@ onUnmounted(() => {
   .lower-grid { grid-template-columns: 1fr; }
   .overview-main { min-height: 34rem; }
   .room-detail-panel { max-height: none; }
-  .calendar-panel { min-height: 20rem; }
+  .calendar-panel { min-height: 23rem; }
   .schedule-panel { min-height: 12rem; }
 }
 
@@ -1009,7 +1061,15 @@ onUnmounted(() => {
   .room-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .room-facts div:nth-child(3) { border-left: 0; border-top: 1px solid var(--dt-border); }
   .room-facts div:nth-child(4) { border-top: 1px solid var(--dt-border); }
-  .calendar-panel { min-height: 21rem; }
+  .calendar-panel { min-height: 23rem; padding: 0.58rem; }
+  .calendar-heading { align-items: flex-start; }
+  .calendar-icon { display: none; }
+  .calendar-heading h2 { font-size: 0.9rem; }
+  .calendar-controls button { width: 1.8rem; height: 1.8rem; }
+  .calendar-controls .today-button { padding-inline: 0.48rem; }
+  .calendar-grid { grid-template-rows: 2.15rem repeat(6, minmax(2.2rem, 1fr)); gap: 0.2rem; height: calc(100% - 3rem); }
+  .weekday small { display: none; }
+  .day-cell { border-radius: 8px; font-size: 0.78rem; }
   .schedule-list { max-height: none; }
 }
 
