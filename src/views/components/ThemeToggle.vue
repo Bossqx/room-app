@@ -25,9 +25,9 @@ const label = computed(() => (isDark.value ? "Switch to light theme" : "Switch t
   width: 2.25rem;
   height: 2.25rem;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.5);
-  background: rgba(255, 255, 255, 0.16);
-  color: #fff;
+  border: 1px solid var(--brand-control-border);
+  background: var(--brand-control-bg);
+  color: var(--brand-on-primary);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -35,7 +35,12 @@ const label = computed(() => (isDark.value ? "Switch to light theme" : "Switch t
 }
 
 .theme-toggle:hover {
-  background: rgba(255, 255, 255, 0.28);
+  background: var(--brand-control-bg-hover);
+}
+
+.theme-toggle:focus-visible {
+  outline: 2px solid var(--brand-on-primary);
+  outline-offset: 2px;
 }
 
 .theme-toggle svg {

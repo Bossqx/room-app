@@ -1,32 +1,35 @@
 import { createRouter, createWebHistory } from "vue-router";
-import DisplayView from "../views/DisplayView.vue";
-import ConfirmSchedule from "../views/confirmSchedule.vue";
-import SelfConfirmSchedule from "../views/SelfConfirm.vue";
-import Login from "../views/Login.vue";
-import BookingSchedule from "../views/BookingScheduleV1.vue";
-import ScheduleDesktopV1 from "../views/ScheduleDesktopV1.vue";
-import DisplayEmptyRoomsV1 from "../views/DisplayEmptyRoomV1.vue";
-import Booking from "../views/Booking.vue";
-import StaffAccess from "../views/StaffAccess.vue";
-import StaffSumitClose from "../views/StaffSumitClose.vue";
-import UserLayoute from "../layouts/UserLayoute.vue";
-import PCLayoute from "../layouts/PCLayoute.vue";
-import GeneralLayout from "../layouts/GeneralLayout.vue";
-import SetFrameLayout from "../layouts/SetFrameLayout.vue";
-import SubmitClose from "../views/StaffSumitClose.vue";
-import ChangePin from "../views/ChangePin.vue";
-import AdminLayout from "../layouts/AdminLayoute.vue";
-import AdminMigration from "../views/AdminMigration.vue";
-import SemesterManage from "../views/SemesterManage.vue";
-import AdminManageSchedule from "../views/AdminManageSchedule.vue";
-import Dashboard from "../views/dashboard.vue";
-import ScheduleAll from "../views/ScheduleAll.vue";
-import ScheduleDashboard from "../views/ScheduleDashboard.vue";
-import ScheduleInfo from "../views/ScheduleInfo.vue";
-import InformationDashboard from "../views/InformationDashboard.vue";
-import InformationMobile from "../views/InformationMobile.vue";
-import RoomAdmin from "../views/RoomAdmin.vue";
-import AdminCancelRoom from "../views/AdminCancelRoom.vue";
+
+const DisplayView = () => import("../views/DisplayView.vue");
+const ConfirmSchedule = () => import("../views/confirmSchedule.vue");
+const SelfConfirmSchedule = () => import("../views/SelfConfirm.vue");
+const Login = () => import("../views/Login.vue");
+const BookingSchedule = () => import("../views/BookingScheduleV1.vue");
+const ScheduleDesktopV1 = () => import("../views/ScheduleDesktopV1.vue");
+const DisplayEmptyRoomsV1 = () => import("../views/DisplayEmptyRoomV1.vue");
+const Booking = () => import("../views/Booking.vue");
+const StaffAccess = () => import("../views/StaffAccess.vue");
+const StaffSumitClose = () => import("../views/StaffSumitClose.vue");
+const SubmitClose = StaffSumitClose;
+const UserLayoute = () => import("../layouts/UserLayoute.vue");
+const PCLayoute = () => import("../layouts/PCLayoute.vue");
+const GeneralLayout = () => import("../layouts/GeneralLayout.vue");
+const SetFrameLayout = () => import("../layouts/SetFrameLayout.vue");
+const ChangePin = () => import("../views/ChangePin.vue");
+const AdminLayout = () => import("../layouts/AdminLayoute.vue");
+const AdminMigration = () => import("../views/AdminMigration.vue");
+const SemesterManage = () => import("../views/SemesterManage.vue");
+const AdminManageSchedule = () => import("../views/AdminManageSchedule.vue");
+const Dashboard = () => import("../views/dashboard.vue");
+const ScheduleAll = () => import("../views/ScheduleAll.vue");
+const ScheduleDashboard = () => import("../views/ScheduleDashboard.vue");
+const ScheduleInfo = () => import("../views/ScheduleInfo.vue");
+const InformationDashboard = () => import("../views/InformationDashboard.vue");
+const InformationMobile = () => import("../views/InformationMobile.vue");
+const RoomAdmin = () => import("../views/RoomAdmin.vue");
+const AdminCancelRoom = () => import("../views/AdminCancelRoom.vue");
+const DashboardTestLayout = () => import("../layouts/DashboardTestLayout.vue");
+const DashboardTest = () => import("../views/DashboardTest.vue");
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -55,6 +58,13 @@ const router = createRouter({
           name: "dashboard-first",
           component: InformationDashboard,
         },
+      ],
+    },
+    {
+      path: "/dashboard-test",
+      component: DashboardTestLayout,
+      children: [
+        { path: "", name: "dashboard-test", component: DashboardTest },
       ],
     },
 

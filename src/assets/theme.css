@@ -21,6 +21,53 @@
 
   --accent-link: #1d4ed8;
   --accent-link-hover: #2563eb;
+
+  --brand-primary: #2563eb;
+  --brand-on-primary: #ffffff;
+  --brand-control-bg: rgba(255, 255, 255, 0.15);
+  --brand-control-bg-hover: rgba(255, 255, 255, 0.28);
+  --brand-control-border: rgba(255, 255, 255, 0.4);
+
+  --dashboard-page: #f5f6f8;
+  --dashboard-surface: #fcfcfb;
+  --dashboard-surface-raised: #ffffff;
+  --dashboard-surface-muted: #f3f2ee;
+  --dashboard-surface-info: #f6f9ff;
+  --dashboard-border: #e1e0d9;
+  --dashboard-border-soft: #ebe9e1;
+  --dashboard-border-muted: #d8d6cd;
+  --dashboard-text: #0b0b0b;
+  --dashboard-text-strong: #191816;
+  --dashboard-text-secondary: #52514e;
+  --dashboard-text-muted: #898781;
+  --dashboard-text-subtle: #74716a;
+  --dashboard-text-soft: #5f5b51;
+  --dashboard-control-text: #2d2b27;
+  --dashboard-shadow: 0 14px 36px rgb(20 20 20 / 0.08);
+  --dashboard-tooltip-shadow: 0 14px 30px rgb(20 20 20 / 0.14);
+
+  --dashboard-accent: #2a78d6;
+  --dashboard-accent-strong: #1c5ca8;
+  --dashboard-accent-soft: #eef4ff;
+  --dashboard-error-bg: #fff0f0;
+  --dashboard-error-text: #a32323;
+  --dashboard-error-border: #ffd0d0;
+
+  --status-free: #1baf7a;
+  --status-busy: #e34948;
+  --status-pending: #eda100;
+  --status-unknown: #a4a29b;
+
+  --chart-blue: #2a78d6;
+  --chart-orange: #eb6834;
+  --chart-aqua: #1baf7a;
+  --chart-yellow: #eda100;
+  --chart-magenta: #e87ba4;
+  --chart-green: #008300;
+  --chart-violet: #4a3aa7;
+  --chart-red: #e34948;
+  --rank-silver: #9c9c94;
+  --rank-bronze: #c17a4a;
 }
 
 :root[data-theme="dark"] {
@@ -46,4 +93,51 @@
 
   --accent-link: #60a5fa;
   --accent-link-hover: #93c5fd;
+
+  --brand-primary: #2563eb;
+  --brand-on-primary: #ffffff;
+  --brand-control-bg: rgba(255, 255, 255, 0.16);
+  --brand-control-bg-hover: rgba(255, 255, 255, 0.28);
+  --brand-control-border: rgba(255, 255, 255, 0.5);
+
+  --dashboard-page: #0d0d0d;
+  --dashboard-surface: #1a1a19;
+  --dashboard-surface-raised: #252420;
+  --dashboard-surface-muted: #2a2925;
+  --dashboard-surface-info: #152033;
+  --dashboard-border: #2c2c2a;
+  --dashboard-border-soft: #38352f;
+  --dashboard-border-muted: #3d3932;
+  --dashboard-text: #ffffff;
+  --dashboard-text-strong: #f6f3eb;
+  --dashboard-text-secondary: #c3c2b7;
+  --dashboard-text-muted: #898781;
+  --dashboard-text-subtle: #c3c2b7;
+  --dashboard-text-soft: #c3c2b7;
+  --dashboard-control-text: #f6f3eb;
+  --dashboard-shadow: 0 14px 36px rgb(0 0 0 / 0.28);
+  --dashboard-tooltip-shadow: 0 14px 30px rgb(0 0 0 / 0.34);
+
+  --dashboard-accent: #3987e5;
+  --dashboard-accent-strong: #93c5fd;
+  --dashboard-accent-soft: #152033;
+  --dashboard-error-bg: #450a0a;
+  --dashboard-error-text: #f87171;
+  --dashboard-error-border: #7f1d1d;
+
+  --status-free: #23c98a;
+  --status-busy: #ef5b5a;
+  --status-pending: #f0b429;
+  --status-unknown: #6b6a64;
+
+  --chart-blue: #3987e5;
+  --chart-orange: #fb923c;
+  --chart-aqua: #23c98a;
+  --chart-yellow: #f0b429;
+  --chart-magenta: #f472b6;
+  --chart-green: #4ade80;
+  --chart-violet: #8b7cf6;
+  --chart-red: #ef5b5a;
+  --rank-silver: #9c9c94;
+  --rank-bronze: #c17a4a;
 }

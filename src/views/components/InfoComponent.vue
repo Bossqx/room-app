@@ -11,6 +11,10 @@ const showBooking = inject<((startTime?: string, finishTime?: string, roomCode?:
   undefined,
 );
 
+const props = defineProps<{
+  selectedRoomNo?: string | null;
+}>();
+
 const emit = defineEmits<{ "select-room": [roomcode: string] }>();
 
 interface RoomSlot {
@@ -49,14 +53,14 @@ interface DashboardData {
 // Fixed categorical order — never cycled/reassigned per re-render.
 // Validated: scripts/validate_palette.js (dataviz skill) — all 6 checks pass at light+dark surfaces.
 const CATEGORICAL = [
-  "#2a78d6", // blue
-  "#eb6834", // orange
-  "#1baf7a", // aqua
-  "#eda100", // yellow
-  "#e87ba4", // magenta
-  "#008300", // green
-  "#4a3aa7", // violet
-  "#e34948", // red (also doubles as "Other")
+  "var(--chart-blue)", // blue
+  "var(--chart-orange)", // orange
+  "var(--chart-aqua)", // aqua
+  "var(--chart-yellow)", // yellow
+  "var(--chart-magenta)", // magenta
+  "var(--chart-green)", // green
+  "var(--chart-violet)", // violet
+  "var(--chart-red)", // red (also doubles as "Other")
 ];
 
 const data = ref<DashboardData | null>(null);
@@ -69,7 +73,6 @@ const personCountEvents = ref<PersonCountEvent[]>([]);
 
 // Look up the latest live count for a room directly off the distinct event list.
 function personCountFor(roomcode: string): number | undefined {
-  console.log("personCountEvents", personCountEvents.value, "looking for roomcode", roomcode);  
   return personCountEvents.value.find((e) => e.room_no === roomcode)?.count;
 }
 
@@ -92,7 +95,6 @@ function subscribePersonCountStream() {
           personCountEvents.value.push(evt);
         }
 
-        console.log("Received person_count event:", personCountEvents.value);
       }
     } catch {
       // ignore malformed SSE payload
@@ -180,9 +182,7 @@ const roomStatuses = computed<RoomStatusInfo[]>(() => {
     );
     if (busySlot) {
       const statusNum = Number(busySlot.usageStatus);
-      //console.log("Status ",!Number.isNaN(statusNum) && statusNum < 3);
       const status = !Number.isNaN(statusNum) && statusNum < 3 ? "schedule_but_unuse" : "busy";
-      console.log("status ",status)
       return { roomcode, status, until: busySlot.finishTime };
     }
 
@@ -274,7 +274,7 @@ const topRooms = computed<TopRoom[]>(() => {
     .slice(0, 3);
 });
 
-const rankColors = ["#eda100", "#9c9c94", "#c17a4a"];
+const rankColors = ["var(--status-pending)", "var(--rank-silver)", "var(--rank-bronze)"];
 
 // ---------------------------------------------------------------------------
 // Sparkline geometry for hours-by-date trend
@@ -296,6 +296,26 @@ const sparkPoints = computed(() => {
 
 const sparkPath = computed(() => sparkPoints.value.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x},${p.y}`).join(" "));
 
+const sparkSummary = computed(() => {
+  const points = sparkPoints.value;
+  if (!points.length) return "ไม่มีข้อมูลแนวโน้มชั่วโมงการใช้งาน";
+
+  const peak = points.reduce((max, point) => (point.hours > max.hours ? point : max), points[0]);
+  const latest = points[points.length - 1];
+  return `แนวโน้มชั่วโมงการใช้งานครอบคลุม ${points.length} วัน รวม ${totalHoursAll.value} ชั่วโมง สูงสุด ${peak.hours} ชั่วโมงในวันที่ ${peak.label} และข้อมูลล่าสุด ${latest.hours} ชั่วโมงในวันที่ ${latest.label}`;
+});
+
+function roomCardAriaLabel(room: RoomStatusInfo): string {
+  const parts = [
+    props.selectedRoomNo === room.roomcode ? `ห้อง ${room.roomcode} ที่เลือกอยู่` : `เลือกห้อง ${room.roomcode}`,
+    `สถานะ${statusLabel[room.status]}`,
+  ];
+  const count = personCountFor(room.roomcode);
+  if (count !== undefined) parts.push(`จำนวนผู้ใช้ ${count} คน`);
+  if (room.until) parts.push(`${room.status === "busy" ? "สิ้นสุด" : "ว่างถึง"} ${room.until}`);
+  return parts.join(", ");
+}
+
 // ---------------------------------------------------------------------------
 // Shared hover tooltip
 // ---------------------------------------------------------------------------
@@ -305,6 +325,19 @@ const tooltip = ref<{ visible: boolean; x: number; y: number; title: string; val
   y: 0,
   title: "",
   value: "",
+});
+
+const usageDonutSummary = computed(
+  () => `การใช้ห้องวันนี้ ${usagePct.value}% จากทั้งหมด ${allRoomsCount.value} ห้อง กำลังใช้งาน ${usageRoomsCount.value} ห้อง`,
+);
+
+const summaryHoursLabel = computed(
+  () => `ชั่วโมงใช้งานสะสม ${totalHoursAll.value} ชั่วโมง จากข้อมูลสรุป ${(data.value?.sumary_hours ?? []).length} รายการ`,
+);
+
+const topRoomsSummary = computed(() => {
+  if (!topRooms.value.length) return "ไม่มีข้อมูลห้องยอดนิยม";
+  return topRooms.value.map((room, index) => `อันดับ ${index + 1} ห้อง ${room.roomcode} จอง ${room.bookings} ครั้ง`).join(", ");
 });
 
 function showTooltip(evt: MouseEvent | FocusEvent, title: string, value: string) {
@@ -332,7 +365,8 @@ onMounted(() => {
 onUnmounted(() => {
   if (clockTimer) clearInterval(clockTimer);
   if (refreshTimer) clearInterval(refreshTimer);
- // personCountStreamSource?.close();
+  personCountStreamSource?.close();
+  personCountStreamSource = null;
 });
 </script>
 
@@ -344,9 +378,9 @@ onUnmounted(() => {
     <template v-else-if="data">
       <!-- Top stat tiles -->
       <div class="stat-row top-stat-row">
-        <div class="stat-tile">
-          <div class="stat-icon icon-blue">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <div class="stat-tile" :aria-label="`ห้องทั้งหมด ${allRoomsCount} ห้อง`">
+          <div class="stat-icon icon-blue" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M3 21h18" /><path d="M5 21V7l7-4 7 4v14" />
               <path d="M9 9h1M14 9h1M9 13h1M14 13h1M9 17h1M14 17h1" />
             </svg>
@@ -357,9 +391,9 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <div class="stat-tile">
-          <div class="stat-icon icon-green">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <div class="stat-tile" :aria-label="`ห้องว่างตอนนี้ ${freeRoomsCount} ห้อง ${freePct}% ของทั้งหมด`">
+          <div class="stat-icon icon-green" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <circle cx="12" cy="12" r="9" /><path d="M9 12l2 2 4-4" />
             </svg>
           </div>
@@ -370,9 +404,9 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <div class="stat-tile">
-          <div class="stat-icon icon-violet">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <div class="stat-tile" :aria-label="`ห้องที่กำลังใช้งาน ${usageRoomsCount} ห้อง ${usagePct}% ของทั้งหมด`">
+          <div class="stat-icon icon-violet" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
               <path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
             </svg>
@@ -384,9 +418,9 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <div class="stat-tile">
-          <div class="stat-icon icon-orange">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <div class="stat-tile" :aria-label="`จองวันนี้ ${scheduleCount} รายการ`">
+          <div class="stat-icon icon-orange" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" />
             </svg>
           </div>
@@ -403,28 +437,29 @@ onUnmounted(() => {
         <div class="panel-head">
           <h2 class="panel-title">สถานะห้องแบบ Real-time</h2>
           <ul class="legend-inline">
-            <li class="legend-free"><span class="dot dot-free"></span>ว่าง</li>
-            <li><span class="dot dot-busy"></span>กำลังใช้งาน</li>
-            <li><span class="dot dot-schedule_but_unuse"></span>มีในตาราง-แต่ไม่มีการใช้งาน</li>
-            <li><span class="dot dot-unknown"></span>ไม่มีข้อมูล</li>
+            <li class="legend-free"><span class="dot dot-free" aria-hidden="true"></span>ว่าง</li>
+            <li><span class="dot dot-busy" aria-hidden="true"></span>กำลังใช้งาน</li>
+            <li><span class="dot dot-schedule_but_unuse" aria-hidden="true"></span>มีในตาราง-แต่ไม่มีการใช้งาน</li>
+            <li><span class="dot dot-unknown" aria-hidden="true"></span>ไม่มีข้อมูล</li>
           </ul>
         </div>
 
         <div v-if="!roomStatuses.length" class="muted">ไม่มีข้อมูลห้อง</div>
-        <div v-else class="room-card-grid">
-          <div
+        <div v-else class="room-card-grid" aria-label="รายการสถานะห้อง">
+          <button
             v-for="r in roomStatuses"
             :key="r.roomcode"
+            type="button"
             class="room-card"
-            :class="`status-${r.status}`"
-            role="button"
-            tabindex="0"
+            :class="[`status-${r.status}`, { selected: props.selectedRoomNo === r.roomcode }]"
+            :aria-pressed="props.selectedRoomNo === r.roomcode"
+            :aria-current="props.selectedRoomNo === r.roomcode ? 'true' : undefined"
+            :aria-label="roomCardAriaLabel(r)"
             @click="emit('select-room', r.roomcode)"
-            @keydown.enter="emit('select-room', r.roomcode)"
           >
             <div class="room-card-top">
               <span class="room-code">{{ r.roomcode }}</span>
-              <span class="dot" :class="`dot-${r.status}`"></span>
+              <span class="dot" :class="`dot-${r.status}`" aria-hidden="true"></span>
             </div>
             <p class="room-status-label">{{ statusLabel[r.status] }}</p>
             <p v-if="personCountFor(r.roomcode) !== undefined" class="room-person-count">
@@ -433,7 +468,7 @@ onUnmounted(() => {
             <p v-if="r.until" class="room-until">
               {{ r.status === "busy" ? "สิ้นสุด" : "ว่างถึง" }} {{ r.until }}
             </p>
-          </div>
+          </button>
         </div>
       </section>
 
@@ -444,7 +479,7 @@ onUnmounted(() => {
           <div v-if="!freeRoomsNow.length" class="muted">ไม่มีห้องว่างในขณะนี้</div>
           <ul v-else class="free-list">
             <li v-for="r in freeRoomsNow" :key="r.roomcode" class="free-row">
-              <span class="dot dot-free"></span>
+              <span class="dot dot-free" aria-hidden="true"></span>
               <span class="free-room">{{ r.roomcode }}</span>
               <span class="free-until">ว่างถึง {{ r.until }}</span>
               <button
@@ -469,7 +504,7 @@ onUnmounted(() => {
               class="timeline-row"
               :class="{ active: isSlotActive(slot) }"
             >
-              <span class="timeline-dot" :style="{ background: roomColorMap.get(slot.roomcode) ?? CATEGORICAL[0] }"></span>
+              <span class="timeline-dot" :style="{ background: roomColorMap.get(slot.roomcode) ?? CATEGORICAL[0] }" aria-hidden="true"></span>
               <span class="timeline-time">{{ slot.startTime }}–{{ slot.finishTime }}</span>
               <span class="timeline-room">ห้อง {{ slot.roomcode }}</span>
               <span
@@ -486,8 +521,8 @@ onUnmounted(() => {
       <div class="stat-row bottom-row">
         <div class="card">
           <p class="card-title">การใช้ห้องวันนี้</p>
-          <div class="donut-wrap">
-            <svg viewBox="0 0 100 100" class="donut-svg">
+          <div class="donut-wrap" role="img" :aria-label="usageDonutSummary">
+            <svg viewBox="0 0 100 100" class="donut-svg" aria-hidden="true">
               <circle cx="50" cy="50" r="42" class="donut-track" />
               <circle
                 cx="50" cy="50" r="42" class="donut-fill"
@@ -502,9 +537,19 @@ onUnmounted(() => {
         </div>
 
         <div class="card">
-          <p class="card-title">แนวโน้มชั่วโมงการใช้งาน</p>
+          <p id="sparkline-summary" class="card-title">แนวโน้มชั่วโมงการใช้งาน</p>
+          <p class="sr-only">{{ sparkSummary }}</p>
           <div v-if="!sparkPoints.length" class="muted">ไม่มีข้อมูล</div>
-          <svg v-else viewBox="0 0 220 56" class="spark-svg" @pointerleave="hideTooltip">
+          <svg
+            v-else
+            viewBox="0 0 220 56"
+            class="spark-svg"
+            role="img"
+            aria-labelledby="sparkline-summary"
+            :aria-describedby="'sparkline-summary-text'"
+            @pointerleave="hideTooltip"
+          >
+            <desc id="sparkline-summary-text">{{ sparkSummary }}</desc>
             <path :d="sparkPath" class="spark-line" />
             <circle
               v-for="p in sparkPoints"
@@ -514,6 +559,8 @@ onUnmounted(() => {
               r="3"
               class="spark-dot"
               tabindex="0"
+              role="img"
+              :aria-label="`${p.label}: ${p.hours} ชม.`"
               @pointermove="showTooltip($event, p.label, `${p.hours} ชม.`)"
               @focus="showTooltip($event, p.label, `${p.hours} ชม.`)"
               @blur="hideTooltip"
@@ -523,16 +570,17 @@ onUnmounted(() => {
 
         <div class="card">
           <p class="card-title">ชั่วโมงใช้งานสะสม</p>
-          <p class="big-number">{{ totalHoursAll }} <span class="stat-unit">ชม.</span></p>
+          <p class="big-number" :aria-label="summaryHoursLabel">{{ totalHoursAll }} <span class="stat-unit">ชม.</span></p>
           <p class="hint">จากข้อมูลสรุป {{ (data.sumary_hours ?? []).length }} รายการ</p>
         </div>
 
         <div class="card">
           <p class="card-title">Top 3 ห้องยอดนิยม</p>
           <div v-if="!topRooms.length" class="muted">ไม่มีข้อมูล</div>
-          <ul v-else class="rank-list">
+          <p class="sr-only">{{ topRoomsSummary }}</p>
+          <ul v-if="topRooms.length" class="rank-list" :aria-label="topRoomsSummary">
             <li v-for="(r, i) in topRooms" :key="r.roomcode" class="rank-row">
-              <span class="rank-badge" :style="{ background: rankColors[i] }">{{ i + 1 }}</span>
+              <span class="rank-badge" :style="{ background: rankColors[i] }" aria-hidden="true">{{ i + 1 }}</span>
               <span class="rank-room">{{ r.roomcode }}</span>
               <span class="rank-value">จอง {{ r.bookings }} ครั้ง</span>
             </li>
@@ -559,24 +607,22 @@ onUnmounted(() => {
 <style scoped>
 .dash-root {
   color-scheme: light;
-  --surface-1: #fcfcfb;
-  --page-plane: #f5f6f8;
-  --text-primary: #0b0b0b;
-  --text-secondary: #52514e;
-  --text-muted: #898781;
-  --gridline: #e1e0d9;
-  --series-1: #2a78d6;
-  --status-free: #1baf7a;
-  --status-busy: #e34948;
-  --status-pending: #eda100;
-  --status-unknown: #a4a29b;
+  --surface-1: var(--dashboard-surface);
+  --page-plane: var(--dashboard-page);
+  --text-primary: var(--dashboard-text);
+  --text-secondary: var(--dashboard-text-secondary);
+  --text-muted: var(--dashboard-text-muted);
+  --gridline: var(--dashboard-border);
+  --series-1: var(--dashboard-accent);
 
   /* Ceiling for the scrolling lists. Starts at the old fixed 22rem on short
      screens and grows with the viewport, so a tall window shows more rows
      before the list falls back to its own inner scrollbar. */
-  --list-max-height: clamp(9rem, calc(100vh - 37rem), 15rem);
+  --list-max-height: clamp(8rem, calc(100vh - 42rem), 13rem);
 
   min-height: 0;
+  min-width: 0;
+  max-width: 100%;
   box-sizing: border-box;
   padding: 0rem 0rem;
   background: var(--page-plane);
@@ -584,28 +630,17 @@ onUnmounted(() => {
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
   display: flex;
   flex-direction: column;
-  gap: 0.65rem;
+  gap: 0.58rem;
 }
 
 html[data-theme="dark"] .dash-root {
   color-scheme: dark;
-  --surface-1: #1a1a19;
-  --page-plane: #0d0d0d;
-  --text-primary: #ffffff;
-  --text-secondary: #c3c2b7;
-  --text-muted: #898781;
-  --gridline: #2c2c2a;
-  --series-1: #3987e5;
-  --status-free: #23c98a;
-  --status-busy: #ef5b5a;
-  --status-pending: #f0b429;
-  --status-unknown: #6b6a64;
 }
 
 .error-box {
-  background: #fee2e2;
-  color: #b91c1c;
-  border: 1px solid #ef4444;
+  background: var(--pill-error-bg);
+  color: var(--pill-error-text);
+  border: 1px solid var(--dashboard-error-border);
   border-radius: 0.5rem;
   padding: 0.6rem 0.9rem;
   font-size: 0.85rem;
@@ -625,29 +660,29 @@ html[data-theme="dark"] .dash-root {
 .stat-row {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.6rem;
+  gap: 0.5rem;
 }
 
 .top-stat-row {
   margin-top: 0;
-  /* 4 KPI tiles as a 2 × 2 grid */
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .stat-tile {
   background: var(--surface-1);
   border: 1px solid var(--gridline);
-  border-radius: 0.65rem;
-  padding: 0.55rem 0.75rem;
+  border-radius: 8px;
+  padding: 0.46rem 0.62rem;
   display: flex;
   align-items: flex-start;
   gap: 0.55rem;
+  min-width: 0;
 }
 
 .stat-icon {
   flex-shrink: 0;
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   border-radius: 0.55rem;
   display: flex;
   align-items: center;
@@ -657,10 +692,10 @@ html[data-theme="dark"] .dash-root {
   width: 18px;
   height: 18px;
 }
-.icon-blue   { background: color-mix(in srgb, #2a78d6 16%, var(--surface-1)); color: #2a78d6; }
+.icon-blue   { background: color-mix(in srgb, var(--dashboard-accent) 16%, var(--surface-1)); color: var(--dashboard-accent); }
 .icon-green  { background: color-mix(in srgb, var(--status-free) 16%, var(--surface-1)); color: var(--status-free); }
-.icon-violet { background: color-mix(in srgb, #4a3aa7 16%, var(--surface-1)); color: #4a3aa7; }
-.icon-orange { background: color-mix(in srgb, #eb6834 16%, var(--surface-1)); color: #eb6834; }
+.icon-violet { background: color-mix(in srgb, var(--chart-violet) 16%, var(--surface-1)); color: var(--chart-violet); }
+.icon-orange { background: color-mix(in srgb, var(--chart-orange) 16%, var(--surface-1)); color: var(--chart-orange); }
 
 .stat-body { min-width: 0; }
 
@@ -671,7 +706,7 @@ html[data-theme="dark"] .dash-root {
 }
 
 .stat-value {
-  font-size: 1.15rem;
+  font-size: 1.22rem;
   font-weight: 700;
   margin: 0;
   line-height: 1.2;
@@ -695,15 +730,17 @@ html[data-theme="dark"] .dash-root {
 .split-row {
   display: grid;
   grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
-  gap: 0.65rem;
+  gap: 0.58rem;
   align-items: start;
 }
 
 .panel {
   background: var(--surface-1);
   border: 1px solid var(--gridline);
-  border-radius: 0.65rem;
-  padding: 0.65rem 0.75rem;
+  border-radius: 8px;
+  padding: 0.58rem 0.66rem;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .panel-head {
@@ -725,6 +762,7 @@ html[data-theme="dark"] .dash-root {
 .legend-inline {
   list-style: none;
   display: flex;
+  flex-wrap: wrap;
   gap: 0.55rem;
   margin: 0;
   padding: 0;
@@ -758,22 +796,35 @@ html[data-theme="dark"] .dash-root {
 /* ── Real-time room cards ── */
 .room-card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(116px, 1fr));
-  gap: 0.45rem;
+  grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+  gap: 0.38rem;
 }
 
 .room-card {
+  appearance: none;
+  width: 100%;
+  background: var(--surface-1);
+  color: inherit;
+  font: inherit;
+  text-align: left;
   border: 1px solid var(--gridline);
-  border-radius: 0.5rem;
-  padding: 0.45rem 0.55rem;
-  border-left: 3px solid var(--status-unknown);
+  border-radius: 8px;
+  padding: 0.43rem 0.56rem;
+  border-left: 1px solid var(--status-unknown);
+  min-height: 3rem;
+  min-width: 0;
   cursor: pointer;
-  transition: box-shadow .15s, border-color .15s;
+  transition: box-shadow .15s, border-color .15s, background .15s;
 }
 .room-card:hover,
 .room-card:focus-visible {
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--series-1) 35%, transparent);
   outline: none;
+}
+.room-card.selected {
+  border-color: var(--dashboard-accent);
+  background: color-mix(in srgb, var(--dashboard-accent) 8%, var(--surface-1));
+  box-shadow: inset 0 0 0 1px var(--dashboard-accent);
 }
 .room-card.status-free               { border-left-color: var(--status-free); }
 .room-card.status-busy               { border-left-color: var(--status-busy); }
@@ -788,6 +839,8 @@ html[data-theme="dark"] .dash-root {
 .room-code {
   font-weight: 700;
   font-size: 0.78rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .room-status-label {
@@ -863,17 +916,17 @@ html[data-theme="dark"] .dash-root {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.28rem;
   max-height: var(--list-max-height);
   overflow-y: auto;
 }
 
 .free-row {
   display: grid;
-  grid-template-columns: auto auto 1fr auto;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.45rem;
-  padding: 0.34rem 0.5rem;
+  padding: 0.28rem 0.45rem;
   border-radius: 0.42rem;
   border: 1px solid var(--gridline);
   font-size: 0.78rem;
@@ -910,17 +963,17 @@ html[data-theme="dark"] .dash-root {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.32rem;
+  gap: 0.28rem;
   max-height: var(--list-max-height);
   overflow-y: auto;
 }
 
 .timeline-row {
   display: grid;
-  grid-template-columns: auto auto 1fr auto;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.45rem;
-  padding: 0.34rem 0.5rem;
+  padding: 0.28rem 0.45rem;
   border-radius: 0.42rem;
   border: 1px solid var(--gridline);
   font-size: 0.78rem;
@@ -948,7 +1001,7 @@ html[data-theme="dark"] .dash-root {
 .active-badge {
   font-size: 0.65rem;
   font-weight: 700;
-  color: #ffffff;
+  color: var(--brand-on-primary);
   border-radius: 999px;
   padding: 0.15rem 0.5rem;
   white-space: nowrap;
@@ -960,8 +1013,8 @@ html[data-theme="dark"] .dash-root {
 .card {
   background: var(--surface-1);
   border: 1px solid var(--gridline);
-  border-radius: 0.65rem;
-  padding: 0.65rem 0.75rem;
+  border-radius: 8px;
+  padding: 0.55rem 0.65rem;
 }
 
 .card-title {
@@ -975,6 +1028,18 @@ html[data-theme="dark"] .dash-root {
   font-size: 0.72rem;
   color: var(--text-muted);
   margin: 0.5rem 0 0;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .big-number {
@@ -1064,7 +1129,7 @@ html[data-theme="dark"] .dash-root {
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  color: #ffffff;
+  color: var(--brand-on-primary);
   font-size: 0.7rem;
   font-weight: 700;
   display: flex;
@@ -1092,7 +1157,7 @@ html[data-theme="dark"] .dash-root {
   border: 1px solid var(--gridline);
   border-radius: 0.4rem;
   padding: 0.45rem 0.6rem;
-  box-shadow: 0 14px 30px rgb(20 20 20 / 0.14);
+  box-shadow: var(--dashboard-tooltip-shadow);
 }
 
 .viz-tooltip-value {
@@ -1122,6 +1187,66 @@ html[data-theme="dark"] .dash-root {
 
   .room-card-grid {
     grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .top-stat-row,
+  .bottom-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 430px) {
+  .top-stat-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .bottom-row {
+    grid-template-columns: 1fr;
+  }
+
+  .stat-tile {
+    padding: 0.48rem 0.5rem;
+    gap: 0.42rem;
+  }
+
+  .stat-icon {
+    width: 28px;
+    height: 28px;
+  }
+
+  .stat-value {
+    font-size: 1rem;
+  }
+
+  .legend-inline {
+    gap: 0.35rem;
+  }
+
+  .room-card-grid {
+    grid-template-columns: repeat(auto-fit, minmax(8.25rem, 1fr));
+  }
+
+  .free-row,
+  .timeline-row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .free-room,
+  .timeline-time {
+    grid-column: 2;
+  }
+
+  .free-until,
+  .timeline-room,
+  .active-badge,
+  .book-btn {
+    grid-column: 1 / -1;
+  }
+
+  .book-btn {
+    justify-self: start;
   }
 }
 </style>
