@@ -220,9 +220,6 @@ async function loadCoreData(showLoading = true) {
     state.value = "ready";
   }
 
-  if (!selectedRoomCode.value) {
-    selectedRoomCode.value = roomStatuses.value[0]?.roomcode ?? rooms.value[0]?.room_no ?? "";
-  }
 }
 
 async function loadSelectedRoomFeatures(roomCode: string) {
@@ -230,6 +227,7 @@ async function loadSelectedRoomFeatures(roomCode: string) {
   applications.value = [];
   accessories.value = [];
   detailError.value = "";
+  detailLoading.value = false;
   if (!roomCode) return;
   detailLoading.value = true;
 
@@ -362,8 +360,11 @@ function personCount(roomcode: string): number | undefined {
 }
 
 function roomAriaLabel(room: RoomStatusView): string {
+  const isSelected = sameRoom(room.roomcode, selectedRoomCode.value);
   const segments = [
-    sameRoom(room.roomcode, selectedRoomCode.value) ? `ห้อง ${room.roomcode} ที่เลือกอยู่` : `เลือกห้อง ${room.roomcode}`,
+    isSelected
+      ? `ยกเลิกการเลือกห้อง ${room.roomcode} และดูตารางทุกห้อง`
+      : `เลือกห้อง ${room.roomcode}`,
     `สถานะ ${room.label}`,
     room.context,
   ];
@@ -372,13 +373,19 @@ function roomAriaLabel(room: RoomStatusView): string {
   return segments.filter(Boolean).join(", ");
 }
 
-const roomSchedules = computed(() => schedules.value.filter((item) =>
-  sameRoom(item.roomcode ?? "", selectedRoomCode.value)),
+function toggleRoomSelection(roomcode: string) {
+  selectedRoomCode.value = sameRoom(roomcode, selectedRoomCode.value) ? "" : roomcode;
+}
+
+const roomSchedules = computed(() => selectedRoomCode.value
+  ? schedules.value.filter((item) => sameRoom(item.roomcode ?? "", selectedRoomCode.value))
+  : schedules.value,
 );
 
 const selectedDaySchedules = computed(() => roomSchedules.value
   .filter((item) => item.schedule_date?.slice(0, 10) === selectedDate.value)
-  .sort((left, right) => left.startTime.localeCompare(right.startTime)),
+  .sort((left, right) => left.startTime.localeCompare(right.startTime)
+    || left.roomcode.localeCompare(right.roomcode, "th", { numeric: true })),
 );
 
 function addMonths(month: string, delta: number): string {
@@ -566,7 +573,7 @@ onUnmounted(() => {
           <div class="section-heading">
             <div>
               <h2 id="room-status-title">สถานะห้องแบบ Real-time</h2>
-              <p>เลือกห้องเพื่อดูรายละเอียดและตาราง</p>
+              <p>เลือกห้องเพื่อดูรายละเอียดและกรองตาราง กดห้องเดิมอีกครั้งเพื่อดูทุกห้อง</p>
             </div>
             <div class="status-legend" aria-label="คำอธิบายสถานะ">
               <span><i class="tone-free" />ว่าง</span>
@@ -591,7 +598,7 @@ onUnmounted(() => {
               :class="[`tone-${room.tone}`, { selected: sameRoom(room.roomcode, selectedRoomCode) }]"
               :aria-pressed="sameRoom(room.roomcode, selectedRoomCode)"
               :aria-label="roomAriaLabel(room)"
-              @click="selectedRoomCode = room.roomcode"
+              @click="toggleRoomSelection(room.roomcode)"
             >
               <span class="room-card-head">
                 <strong>{{ room.roomcode }}</strong>
@@ -667,7 +674,7 @@ onUnmounted(() => {
       <section class="calendar-panel" aria-labelledby="calendar-title">
         <header class="calendar-heading">
           <div>
-            <h2 id="calendar-title">ปฏิทินการใช้ห้อง <span>{{ selectedRoomCode || "—" }}</span></h2>
+            <h2 id="calendar-title">ปฏิทินการใช้ห้อง <span>{{ selectedRoomCode || "ทุกห้อง" }}</span></h2>
             <p>{{ monthLabel }}</p>
           </div>
           <div class="calendar-controls" aria-label="ควบคุมเดือนที่แสดง">
@@ -681,7 +688,7 @@ onUnmounted(() => {
           </div>
         </header>
         <p class="sr-only" aria-live="polite">วันที่เลือก {{ selectedDateLabel }} มี {{ selectedDaySchedules.length }} รายการ</p>
-        <div class="calendar-grid" :aria-label="`ปฏิทิน ${monthLabel} ห้อง ${selectedRoomCode}`">
+        <div class="calendar-grid" :aria-label="`ปฏิทิน ${monthLabel} ${selectedRoomCode ? `ห้อง ${selectedRoomCode}` : 'ทุกห้อง'}`">
           <span v-for="weekday in ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส']" :key="weekday" class="weekday">{{ weekday }}</span>
           <button
             v-for="day in calendarDays"
@@ -708,12 +715,15 @@ onUnmounted(() => {
           <div><h2 id="schedule-title">ตารางการใช้ห้อง</h2><p>{{ selectedDateLabel }}</p></div>
           <span>{{ selectedDaySchedules.length }} รายการ</span>
         </header>
-        <div v-if="!selectedRoomCode" class="schedule-empty">เลือกห้องเพื่อดูตาราง</div>
-        <div v-else-if="!selectedDaySchedules.length" class="schedule-empty">ไม่มีรายการในวันที่เลือก</div>
+        <div v-if="!selectedDaySchedules.length" class="schedule-empty">ไม่มีรายการในวันที่เลือก</div>
         <ol v-else class="schedule-list">
-          <li v-for="item in selectedDaySchedules" :key="`${item.schedule_id ?? item.id ?? item.rowId}-${item.startTime}`">
+          <li v-for="item in selectedDaySchedules" :key="`${item.schedule_id ?? item.id ?? item.rowId}-${item.roomcode}-${item.startTime}`">
+            <span class="schedule-room">ห้อง {{ item.roomcode || selectedRoomCode }}</span>
             <time>{{ item.startTime }}–{{ item.finishTime }}</time>
-            <div><strong>{{ scheduleTitle(item) }}</strong><span v-if="scheduleOwner(item)">{{ scheduleOwner(item) }}</span></div>
+            <div>
+              <strong>{{ scheduleTitle(item) }}</strong>
+              <span v-if="scheduleOwner(item)">{{ scheduleOwner(item) }}</span>
+            </div>
             <span class="schedule-state" :class="scheduleTone(item)">{{ scheduleStatus(item) }}</span>
           </li>
         </ol>
@@ -947,7 +957,8 @@ onUnmounted(() => {
 
 .schedule-heading > span { padding: 0.24rem 0.42rem; border-radius: 999px; background: var(--dt-blue-soft); color: var(--dt-blue); font-size: 0.6rem; font-weight: 750; white-space: nowrap; }
 .schedule-list { display: flex; flex-direction: column; gap: 0.22rem; max-height: calc(100% - 2.35rem); margin: 0; padding: 0; overflow-y: auto; list-style: none; scrollbar-width: thin; }
-.schedule-list li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 0.4rem; min-width: 0; padding: 0.28rem 0.34rem; border: 1px solid var(--dt-border); border-radius: 8px; background: var(--dt-surface-alt); }
+.schedule-list li { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; align-items: center; gap: 0.4rem; min-width: 0; padding: 0.28rem 0.34rem; border: 1px solid var(--dt-border); border-radius: 8px; background: var(--dt-surface-alt); }
+.schedule-room { min-width: 4.7rem; color: var(--dt-text); font-size: 0.68rem; font-weight: 800; text-align: center; white-space: nowrap; }
 .schedule-list time { min-width: 4.7rem; padding: 0.24rem 0.32rem; border-radius: 5px; background: var(--dt-blue); color: #fff; font-size: 0.68rem; font-weight: 800; font-variant-numeric: tabular-nums; text-align: center; white-space: nowrap; }
 .schedule-list div { min-width: 0; }
 .schedule-list strong,
@@ -1010,6 +1021,7 @@ onUnmounted(() => {
   .room-grid { grid-template-columns: 1fr; }
   .status-panel { min-height: 25rem; }
   .schedule-list li { grid-template-columns: auto minmax(0, 1fr); }
+  .schedule-list div { grid-column: 1 / -1; }
   .schedule-state { grid-column: 2; justify-self: start; }
 }
 
