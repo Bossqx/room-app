@@ -514,7 +514,7 @@ const calendarDays = computed<CalendarDay[]>(() => {
   start.setDate(firstOfMonth.getDate() - firstOfMonth.getDay());
   const today = localDateKey(new Date());
 
-  return Array.from({ length: 42 }, (_, index) => {
+  return Array.from({ length: 35 }, (_, index) => {
     const date = new Date(start);
     date.setDate(start.getDate() + index);
     const key = localDateKey(date);
@@ -873,21 +873,39 @@ onUnmounted(() => {
 
       <section class="schedule-panel" aria-labelledby="schedule-title">
         <header class="schedule-heading">
-          <div><h2 id="schedule-title">ตารางการใช้ห้อง</h2><p>{{ selectedDateLabel }}</p></div>
+          <div class="schedule-title-group">
+            <span class="schedule-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M7 3v3M17 3v3M4 8h16M5 5h14a1 1 0 0 1 1 1v14H4V6a1 1 0 0 1 1-1Z" /><path d="M8 12h3M13 12h3M8 16h3M13 16h3" /></svg>
+            </span>
+            <div><h2 id="schedule-title">ตารางการใช้ห้อง</h2><p>{{ selectedDateLabel }}</p></div>
+          </div>
           <span>{{ selectedDaySchedules.length }} รายการ</span>
         </header>
         <div v-if="!selectedDaySchedules.length" class="schedule-empty">ไม่มีรายการในวันที่เลือก</div>
-        <ol v-else class="schedule-list">
-          <li v-for="item in selectedDaySchedules" :key="`${item.schedule_id ?? item.id ?? item.rowId}-${item.roomcode}-${item.startTime}`">
-            <span class="schedule-room">ห้อง {{ item.roomcode || selectedRoomCode }}</span>
-            <time>{{ item.startTime }}–{{ item.finishTime }}</time>
-            <div>
-              <strong>{{ scheduleTitle(item) }}</strong>
-              <span v-if="scheduleOwner(item)">{{ scheduleOwner(item) }}</span>
+        <div v-else class="schedule-table" role="table" :aria-label="`ตารางการใช้ห้อง ${selectedDateLabel}`">
+          <div class="schedule-table-head" role="row">
+            <span role="columnheader">เวลา</span>
+            <span role="columnheader">ห้อง</span>
+            <span role="columnheader">รายวิชา / ผู้สอน</span>
+            <span role="columnheader">การดำเนินการ</span>
+          </div>
+          <div class="schedule-table-body" role="rowgroup">
+            <div
+              v-for="item in selectedDaySchedules"
+              :key="`${item.schedule_id ?? item.id ?? item.rowId}-${item.roomcode}-${item.startTime}`"
+              class="schedule-table-row"
+              role="row"
+            >
+              <time role="cell">{{ item.startTime }}–{{ item.finishTime }}</time>
+              <strong class="schedule-room" role="cell">{{ item.roomcode || selectedRoomCode }}</strong>
+              <div class="schedule-subject" role="cell">
+                <span class="schedule-course">{{ scheduleTitle(item) }}</span>
+                <span class="schedule-owner">ผู้สอน: {{ scheduleOwner(item) || "—" }}</span>
+              </div>
+              <span class="schedule-state" :class="scheduleTone(item)" role="cell">{{ scheduleStatus(item) }}</span>
             </div>
-            <span class="schedule-state" :class="scheduleTone(item)">{{ scheduleStatus(item) }}</span>
-          </li>
-        </ol>
+          </div>
+        </div>
       </section>
     </section>
   </div>
@@ -1246,7 +1264,7 @@ onUnmounted(() => {
 .calendar-controls button:hover { border-color: color-mix(in srgb, var(--dt-blue) 48%, var(--dt-border)); background: var(--dt-blue-soft); }
 .calendar-controls .today-button { width: auto; padding-inline: 0.68rem; background: var(--dt-blue-soft); color: var(--dt-blue); font-size: 0.72rem; font-weight: 800; }
 .calendar-controls svg { width: 1rem; height: 1rem; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
-.calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); grid-template-rows: minmax(2.1rem, auto) repeat(6, minmax(1.55rem, 1fr)); gap: 0.28rem; height: calc(100% - 3.25rem); min-height: 0; }
+.calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); grid-template-rows: minmax(2.1rem, auto) repeat(5, minmax(1.55rem, 1fr)); gap: 0.28rem; height: calc(100% - 3.25rem); min-height: 0; }
 .weekday { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 0; padding: 0.24rem 0.15rem; border-radius: 10px; background: var(--dt-blue-soft); color: var(--dt-text); text-align: center; }
 .weekday b { font-size: 0.76rem; line-height: 1; }
 .weekday.sunday { background: var(--dt-red-soft); color: var(--dt-red); }
@@ -1263,16 +1281,26 @@ onUnmounted(() => {
 .day-cell.selected i { background: #fff; }
 
 .schedule-heading > span { padding: 0.24rem 0.42rem; border-radius: 999px; background: var(--dt-blue-soft); color: var(--dt-blue); font-size: 0.6rem; font-weight: 750; white-space: nowrap; }
-.schedule-list { display: flex; flex-direction: column; gap: 0.22rem; max-height: calc(100% - 2.35rem); margin: 0; padding: 0; overflow-y: auto; list-style: none; scrollbar-width: thin; }
-.schedule-list li { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; align-items: center; gap: 0.4rem; min-width: 0; padding: 0.28rem 0.34rem; border: 1px solid var(--dt-border); border-radius: 8px; background: var(--dt-surface-alt); }
-.schedule-room { min-width: 4.7rem; color: var(--dt-text); font-size: 0.68rem; font-weight: 800; text-align: center; white-space: nowrap; }
-.schedule-list time { min-width: 4.7rem; padding: 0.24rem 0.32rem; border-radius: 5px; background: var(--dt-blue); color: #fff; font-size: 0.68rem; font-weight: 800; font-variant-numeric: tabular-nums; text-align: center; white-space: nowrap; }
-.schedule-list div { min-width: 0; }
-.schedule-list strong,
-.schedule-list div > span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.schedule-list strong { font-size: 0.72rem; }
-.schedule-list div > span { margin-top: 0.08rem; color: var(--dt-soft); font-size: 0.66rem; }
-.schedule-state { padding: 0.2rem 0.34rem; border-radius: 999px; font-size: 0.68rem; font-weight: 750; white-space: nowrap; }
+.schedule-panel { display: flex; flex-direction: column; }
+.schedule-title-group { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+.schedule-icon { display: inline-flex; align-items: center; justify-content: center; width: 2rem; height: 2rem; flex: 0 0 auto; border-radius: 9px; background: var(--dt-blue-soft); color: var(--dt-blue); }
+.schedule-icon svg { width: 1.2rem; height: 1.2rem; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.schedule-table { display: flex; flex: 1; min-height: 0; flex-direction: column; overflow: hidden; border: 1px solid var(--dt-border); border-radius: 9px; background: var(--dt-surface); }
+.schedule-table-head,
+.schedule-table-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 0.78fr) minmax(0, 2.75fr) minmax(0, 0.9fr); align-items: center; min-width: 0; }
+.schedule-table-head { flex: 0 0 auto; background: var(--dt-blue-soft); color: var(--dt-soft); font-size: 0.8rem; font-weight: 800; }
+.schedule-table-head span { padding: 0.42rem 0.44rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.schedule-table-head > * + * { border-left: 1px solid color-mix(in srgb, var(--dt-border) 70%, transparent); }
+.schedule-table-body { min-height: 0; overflow-x: hidden; overflow-y: auto; scrollbar-width: thin; }
+.schedule-table-row { border-bottom: 1px solid var(--dt-border); font-size: 0.86rem; }
+.schedule-table-row > * { min-width: 0; padding: 0.42rem 0.44rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.schedule-table-row > * + * { border-left: 1px solid color-mix(in srgb, var(--dt-border) 70%, transparent); }
+.schedule-table-row time { justify-self: start; margin-left: 0.32rem; padding: 0.22rem 0.34rem; border-radius: 6px; background: var(--dt-blue-soft); color: var(--dt-blue); font-size: 0.78rem; font-weight: 850; font-variant-numeric: tabular-nums; }
+.schedule-room { color: var(--dt-text); font-size: 0.86rem; font-weight: 800; }
+.schedule-subject { display: flex; flex-direction: column; align-items: flex-start; gap: 0.08rem; border-right: 1px solid color-mix(in srgb, var(--dt-border) 70%, transparent); line-height: 1.25; }
+.schedule-course { display: block; max-width: 100%; overflow: hidden; color: var(--dt-text); font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.schedule-owner { display: block; max-width: 100%; overflow: hidden; color: var(--dt-soft); font-size: 0.76rem; font-weight: 550; text-overflow: ellipsis; white-space: nowrap; }
+.schedule-state { justify-self: center; padding: 0.22rem 0.36rem; border-left: 0; border-radius: 999px; font-size: 0.78rem; font-weight: 750; white-space: nowrap; }
 .schedule-state.confirmed { background: var(--dt-green-soft); color: var(--dt-green); }
 .schedule-state.closed { background: var(--dt-red-soft); color: var(--dt-red); }
 .schedule-state.scheduled { background: var(--dt-amber-soft); color: var(--dt-amber); }
@@ -1284,7 +1312,7 @@ onUnmounted(() => {
 }
 
 @media (min-width: 1200px) and (min-height: 850px) {
-  .calendar-grid { grid-template-rows: minmax(2.6rem, auto) repeat(6, minmax(2.15rem, 1fr)); }
+  .calendar-grid { grid-template-rows: minmax(2.6rem, auto) repeat(5, minmax(2.15rem, 1fr)); }
 }
 
 @media (max-width: 1199px) {
@@ -1330,9 +1358,19 @@ onUnmounted(() => {
   .calendar-heading h2 { font-size: 0.9rem; }
   .calendar-controls button { width: 1.8rem; height: 1.8rem; }
   .calendar-controls .today-button { padding-inline: 0.48rem; }
-  .calendar-grid { grid-template-rows: 2.15rem repeat(6, minmax(2.2rem, 1fr)); gap: 0.2rem; height: calc(100% - 3rem); }
+  .calendar-grid { grid-template-rows: 2.15rem repeat(5, minmax(2.2rem, 1fr)); gap: 0.2rem; height: calc(100% - 3rem); }
   .day-cell { border-radius: 8px; font-size: 0.78rem; }
-  .schedule-list { max-height: none; }
+  .schedule-panel { min-height: 18rem; }
+  .schedule-table { overflow: visible; border: 0; background: transparent; }
+  .schedule-table-head { display: none; }
+  .schedule-table-body { display: flex; flex-direction: column; gap: 0.32rem; overflow: visible; }
+  .schedule-table-row { grid-template-columns: minmax(0, 1fr) auto; gap: 0.12rem 0.5rem; padding: 0.42rem 0.5rem; border: 1px solid var(--dt-border); border-radius: 9px; background: var(--dt-surface-alt); }
+  .schedule-table-row > * { padding: 0; border-left: 0; }
+  .schedule-table-row time { grid-column: 1; grid-row: 1; justify-self: start; margin: 0; padding: 0.2rem 0.32rem; }
+  .schedule-room { grid-column: 2; grid-row: 1; text-align: right; }
+  .schedule-subject { grid-column: 1 / -1; grid-row: 2; border-right: 0; }
+  .schedule-course { font-size: 0.9rem; }
+  .schedule-state { grid-column: 2; grid-row: 3; }
 }
 
 @media (max-width: 390px) {
@@ -1342,9 +1380,6 @@ onUnmounted(() => {
   .kpi-card strong { font-size: 1.28rem; }
   .room-grid { grid-template-columns: 1fr; }
   .status-panel { min-height: 25rem; }
-  .schedule-list li { grid-template-columns: auto minmax(0, 1fr); }
-  .schedule-list div { grid-column: 1 / -1; }
-  .schedule-state { grid-column: 2; justify-self: start; }
 }
 
 @media (prefers-reduced-motion: reduce) {
