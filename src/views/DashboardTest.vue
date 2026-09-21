@@ -21,6 +21,10 @@ interface DashboardPayload {
   list_usage_rooms: RoomSlot[];
 }
 
+interface RoomImageRecord {
+  image: string;
+}
+
 interface RoomRecord {
   id?: number;
   room_no: string;
@@ -30,6 +34,7 @@ interface RoomRecord {
   building?: string | null;
   computer_no?: number | null;
   seat_no?: number | null;
+  images?: RoomImageRecord[];
 }
 
 interface FeatureRecord {
@@ -102,6 +107,10 @@ const errorMessage = ref("");
 const detailLoading = ref(false);
 const detailError = ref("");
 const selectedRoomCode = ref("");
+const selectedRoomDetail = ref<RoomRecord | null>(null);
+const selectedGalleryIndex = ref(0);
+const lightboxDialog = ref<HTMLDialogElement | null>(null);
+const lightboxImageFailed = ref(false);
 const selectedDate = ref(localDateKey(new Date()));
 const visibleMonth = ref(selectedDate.value.slice(0, 7));
 const now = ref(new Date());
@@ -182,6 +191,13 @@ function normalizeRooms(payload: unknown): RoomRecord[] {
       building: stringOf(raw, ["building", "building_name", "buildingName"]),
       computer_no: numberOf(raw, ["computer_no", "computerNo", "computers", "computer_count"]),
       seat_no: numberOf(raw, ["seat_no", "seatNo", "seats", "seat_count"]),
+      images: Array.isArray(raw.images)
+        ? raw.images.flatMap((item) => {
+            if (!item || typeof item !== "object") return [];
+            const image = stringOf(item as Record<string, unknown>, ["image"]);
+            return image ? [{ image }] : [];
+          })
+        : [],
     }];
   });
 }
@@ -235,18 +251,20 @@ async function loadSelectedRoomFeatures(roomCode: string) {
   const requestGeneration = ++detailRequestGeneration;
   applications.value = [];
   accessories.value = [];
+  selectedRoomDetail.value = null;
   detailError.value = "";
   detailLoading.value = false;
   if (!roomCode) return;
   detailLoading.value = true;
 
-  const [applicationsResult, accessoriesResult] = await Promise.allSettled([
+  const [applicationsResult, accessoriesResult, roomResult] = await Promise.allSettled([
     fetchJson<FeatureRecord[]>(
       `${API_BASE}/application/get_list_application/?room_no=${encodeURIComponent(roomCode)}`,
     ),
     fetchJson<FeatureRecord[]>(
       `${API_BASE}/accessory/get_list_accessory/?room_no=${encodeURIComponent(roomCode)}`,
     ),
+    fetchJson<unknown>(`${API_BASE}/room/get_room/${encodeURIComponent(roomCode)}`),
   ]);
 
   if (requestGeneration !== detailRequestGeneration || !sameRoom(roomCode, selectedRoomCode.value)) return;
@@ -256,6 +274,9 @@ async function loadSelectedRoomFeatures(roomCode: string) {
   }
   if (accessoriesResult.status === "fulfilled" && Array.isArray(accessoriesResult.value)) {
     accessories.value = accessoriesResult.value;
+  }
+  if (roomResult.status === "fulfilled") {
+    selectedRoomDetail.value = normalizeRooms([roomResult.value])[0] ?? null;
   }
   if (applicationsResult.status === "rejected" && accessoriesResult.status === "rejected") {
     detailError.value = "ไม่สามารถโหลดข้อมูลซอฟต์แวร์และอุปกรณ์ได้";
@@ -338,7 +359,9 @@ const roomStatuses = computed<RoomStatusView[]>(() => {
 });
 
 const selectedRoom = computed(() =>
-  rooms.value.find((room) => sameRoom(room.room_no, selectedRoomCode.value)) ?? null,
+  selectedRoomDetail.value
+  ?? rooms.value.find((room) => sameRoom(room.room_no, selectedRoomCode.value))
+  ?? null,
 );
 
 const selectedRoomStatus = computed(() =>
@@ -346,11 +369,78 @@ const selectedRoomStatus = computed(() =>
   ?? { roomcode: selectedRoomCode.value, tone: "unknown" as const, label: "ไม่มีข้อมูลสถานะ", context: "" },
 );
 
-const roomImageUrl = computed(() => {
-  const value = selectedRoom.value?.panorama?.trim();
-  if (!value || imageFailed.value) return "";
-  return /^(https?:|data:|\/)/.test(value) ? value : "";
+const roomGalleryImages = computed(() => {
+  const room = selectedRoom.value;
+  if (!room) return [];
+
+  const gallery: Array<{ src: string; alt: string }> = [];
+
+  const panorama = room.panorama?.trim();
+  if (panorama) {
+    gallery.push({
+      src: /^(https?:|data:|\/)/.test(panorama)
+      ? panorama
+      : `${API_BASE}/room/get_panorama/${encodeURIComponent(room.room_no)}`,
+      alt: `ภาพ Panorama ห้อง ${room.room_no}`,
+    });
+  }
+
+  room.images?.forEach((item, index) => {
+    const imagePath = item.image?.trim();
+    if (!imagePath) return;
+    gallery.push({
+      src: `${API_BASE}/room/get_room_image/${encodeURIComponent(imagePath)}`,
+      alt: `ภาพห้อง ${room.room_no} รูปที่ ${index + 1}`,
+    });
+  });
+
+  return gallery.filter((item, index, items) =>
+    items.findIndex((candidate) => candidate.src === item.src) === index,
+  );
 });
+
+const selectedGalleryImage = computed(() =>
+  roomGalleryImages.value[selectedGalleryIndex.value] ?? roomGalleryImages.value[0] ?? null,
+);
+
+const roomImageUrl = computed(() =>
+  imageFailed.value ? "" : selectedGalleryImage.value?.src ?? "",
+);
+
+function selectRoomImage(index: number) {
+  selectedGalleryIndex.value = index;
+  imageFailed.value = false;
+}
+
+async function openLightbox(index = selectedGalleryIndex.value) {
+  selectRoomImage(index);
+  lightboxImageFailed.value = false;
+  await nextTick();
+  if (lightboxDialog.value && !lightboxDialog.value.open) {
+    lightboxDialog.value.showModal();
+  }
+}
+
+function closeLightbox() {
+  lightboxDialog.value?.close();
+}
+
+function stepLightbox(direction: number) {
+  const total = roomGalleryImages.value.length;
+  if (total < 2) return;
+  selectRoomImage((selectedGalleryIndex.value + direction + total) % total);
+  lightboxImageFailed.value = false;
+}
+
+function handleLightboxKeydown(event: KeyboardEvent) {
+  if (event.key === "ArrowLeft") {
+    event.preventDefault();
+    stepLightbox(-1);
+  } else if (event.key === "ArrowRight") {
+    event.preventDefault();
+    stepLightbox(1);
+  }
+}
 
 const activeApplications = computed(() =>
   applications.value.filter((item) => item.usage !== false && featureLabel(item)),
@@ -519,6 +609,8 @@ function scheduleTone(item: ScheduleRecord): string {
 }
 
 watch(selectedRoomCode, (roomCode) => {
+  closeLightbox();
+  selectedGalleryIndex.value = 0;
   imageFailed.value = false;
   loadSelectedRoomFeatures(roomCode);
 });
@@ -546,9 +638,17 @@ onUnmounted(() => {
     <section class="overview-grid" aria-label="ภาพรวมสถานะห้อง">
       <div class="overview-main">
         <header class="time-strip">
-          <div>
-            <p class="date-label">{{ dateLabel }}</p>
-            <p class="time-label" aria-label="เวลาปัจจุบัน">{{ timeLabel }}</p>
+          <div class="current-time">
+            <span class="time-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="8.5" />
+                <path d="M12 7.5V12l3 2" />
+              </svg>
+            </span>
+            <div>
+              <p class="date-label">{{ dateLabel }}</p>
+              <time class="time-label" :datetime="now.toISOString()" aria-label="เวลาปัจจุบัน">{{ timeLabel }}</time>
+            </div>
           </div>
           <div class="live-indicator" aria-label="ข้อมูลสถานะปัจจุบัน">
             <span class="live-dot" :class="{ connected: state === 'ready' }" aria-hidden="true" />
@@ -640,16 +740,44 @@ onUnmounted(() => {
             </span>
           </header>
 
-          <div class="room-image" :class="{ empty: !roomImageUrl }">
-            <img
-              v-if="roomImageUrl"
-              :src="roomImageUrl"
-              :alt="`ภาพห้อง ${selectedRoomCode}`"
-              @error="imageFailed = true"
-            />
-            <div v-else class="image-empty">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM4 15l4-4 4 4 3-3 5 5M9 9h.01" /></svg>
-              <span>ไม่มีรูปห้องในข้อมูลปัจจุบัน</span>
+          <div class="room-gallery" :class="{ 'has-thumbnails': roomGalleryImages.length > 1 }">
+            <div class="room-image" :class="{ empty: !roomImageUrl }">
+              <button
+                v-if="roomImageUrl"
+                type="button"
+                class="room-image-trigger"
+                :aria-label="`เปิดดู${selectedGalleryImage?.alt || `ภาพห้อง ${selectedRoomCode}`}ขนาดใหญ่`"
+                @click="openLightbox()"
+              >
+                <img
+                  :src="roomImageUrl"
+                  :alt="selectedGalleryImage?.alt || `ภาพห้อง ${selectedRoomCode}`"
+                  @error="imageFailed = true"
+                />
+                <span class="image-zoom-hint" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m15.5 15.5 4 4M10.5 7.5v6M7.5 10.5h6" /></svg>
+                  ดูภาพใหญ่
+                </span>
+              </button>
+              <div v-else class="image-empty">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM4 15l4-4 4 4 3-3 5 5M9 9h.01" /></svg>
+                <span>ไม่มีรูปห้องในข้อมูลปัจจุบัน</span>
+              </div>
+            </div>
+
+            <div v-if="roomGalleryImages.length > 1" class="room-thumbnails" aria-label="รูปภาพห้องทั้งหมด">
+              <button
+                v-for="(image, index) in roomGalleryImages"
+                :key="image.src"
+                type="button"
+                class="room-thumbnail"
+                :class="{ selected: selectedGalleryIndex === index }"
+                :aria-pressed="selectedGalleryIndex === index"
+                :aria-label="`แสดง${image.alt}`"
+                @click="selectRoomImage(index)"
+              >
+                <img :src="image.src" :alt="image.alt" loading="lazy" />
+              </button>
             </div>
           </div>
 
@@ -714,8 +842,7 @@ onUnmounted(() => {
             class="weekday"
             :class="{ sunday: index === 0, saturday: index === 6 }"
           >
-            <b>{{ weekday.short }}</b>
-            <small>{{ weekday.full }}</small>
+            <b>{{ weekday.full }}</b>
           </span>
           <button
             v-for="(day, index) in calendarDays"
@@ -764,6 +891,72 @@ onUnmounted(() => {
       </section>
     </section>
   </div>
+
+  <Teleport to="body">
+    <dialog
+      ref="lightboxDialog"
+      class="room-lightbox"
+      aria-labelledby="room-lightbox-title"
+      @click.self="closeLightbox"
+      @keydown="handleLightboxKeydown"
+    >
+      <div class="lightbox-shell">
+        <header class="lightbox-header">
+          <div>
+            <h2 id="room-lightbox-title">ห้อง {{ selectedRoomCode }}</h2>
+            <p v-if="roomGalleryImages.length > 1">รูปที่ {{ selectedGalleryIndex + 1 }} จาก {{ roomGalleryImages.length }}</p>
+          </div>
+          <button type="button" class="lightbox-close" aria-label="ปิดหน้าต่างดูรูป" autofocus @click="closeLightbox">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
+          </button>
+        </header>
+
+        <div class="lightbox-stage">
+          <button
+            v-if="roomGalleryImages.length > 1"
+            type="button"
+            class="lightbox-nav previous"
+            aria-label="ดูรูปก่อนหน้า"
+            @click="stepLightbox(-1)"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
+          </button>
+
+          <img
+            v-if="selectedGalleryImage && !lightboxImageFailed"
+            :src="selectedGalleryImage.src"
+            :alt="selectedGalleryImage.alt"
+            @error="lightboxImageFailed = true"
+          />
+          <div v-else class="lightbox-error" role="status">ไม่สามารถแสดงรูปนี้ได้</div>
+
+          <button
+            v-if="roomGalleryImages.length > 1"
+            type="button"
+            class="lightbox-nav next"
+            aria-label="ดูรูปถัดไป"
+            @click="stepLightbox(1)"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
+          </button>
+        </div>
+
+        <div v-if="roomGalleryImages.length > 1" class="lightbox-thumbnails" aria-label="เลือกรูปที่ต้องการดู">
+          <button
+            v-for="(image, index) in roomGalleryImages"
+            :key="`lightbox-${image.src}`"
+            type="button"
+            :class="{ selected: selectedGalleryIndex === index }"
+            :aria-pressed="selectedGalleryIndex === index"
+            :aria-label="`ดู${image.alt}`"
+            @click="selectRoomImage(index); lightboxImageFailed = false"
+          >
+            <img :src="image.src" alt="" />
+          </button>
+        </div>
+      </div>
+    </dialog>
+  </Teleport>
 </template>
 
 <style scoped>
@@ -846,11 +1039,39 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 2.75rem;
-  padding: 0.18rem 0.55rem;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
+  min-height: 3.25rem;
+  padding: 0.34rem 0.58rem;
+  border-color: color-mix(in srgb, var(--dt-blue) 22%, var(--dt-border));
+  background: color-mix(in srgb, var(--dt-blue-soft) 58%, var(--dt-surface));
+}
+
+.current-time {
+  display: flex;
+  align-items: center;
+  gap: 0.58rem;
+  min-width: 0;
+}
+
+.time-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.35rem;
+  height: 2.35rem;
+  flex: 0 0 auto;
+  border-radius: 10px;
+  background: var(--dt-blue);
+  color: #fff;
+}
+
+.time-icon svg {
+  width: 1.42rem;
+  height: 1.42rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .date-label,
@@ -862,8 +1083,8 @@ onUnmounted(() => {
 .calendar-heading p,
 .schedule-heading p { margin: 0; }
 
-.date-label { color: var(--dt-muted); font-size: 0.75rem; }
-.time-label { margin-top: 0.03rem; font-size: 1.62rem; line-height: 1; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.date-label { color: var(--dt-muted); font-size: 0.73rem; font-weight: 650; }
+.time-label { display: block; margin-top: 0.04rem; color: var(--dt-text); font-size: 1.82rem; line-height: 0.92; font-weight: 850; font-variant-numeric: tabular-nums; letter-spacing: -0.025em; }
 .live-indicator { display: inline-flex; align-items: center; gap: 0.38rem; color: var(--dt-muted); font-size: 0.72rem; font-weight: 650; }
 .live-dot { width: 0.52rem; height: 0.52rem; border-radius: 50%; background: var(--dt-gray); }
 .live-dot.connected { background: var(--dt-green); }
@@ -948,10 +1169,50 @@ onUnmounted(() => {
 .status-badge.tone-busy { background: var(--dt-red-soft); }
 .status-badge.tone-scheduled { background: var(--dt-amber-soft); }
 .status-badge.tone-unknown { background: color-mix(in srgb, var(--dt-gray) 12%, var(--dt-surface)); }
+.room-gallery { display: flex; flex-direction: column; gap: 0.38rem; }
 .room-image { display: flex; align-items: center; justify-content: center; width: 100%; height: 8.75rem; min-height: 8.75rem; max-height: 8.75rem; overflow: hidden; border: 1px dashed color-mix(in srgb, var(--dt-blue) 22%, var(--dt-border)); border-radius: 10px; background: color-mix(in srgb, var(--dt-blue-soft) 42%, var(--dt-surface-alt)); }
-.room-image img { width: 100%; height: 8.75rem; min-height: 8.75rem; max-height: 8.75rem; object-fit: cover; }
+.room-image-trigger { position: relative; width: 100%; height: 100%; padding: 0; overflow: hidden; border: 0; background: transparent; color: inherit; cursor: zoom-in; }
+.room-image-trigger img { width: 100%; height: 100%; object-fit: contain; background: var(--dt-surface-alt); }
+.room-image-trigger:focus-visible { outline: 2px solid var(--dt-blue); outline-offset: -3px; }
+.image-zoom-hint { position: absolute; right: 0.48rem; bottom: 0.42rem; display: inline-flex; align-items: center; gap: 0.28rem; padding: 0.26rem 0.42rem; border-radius: 6px; background: rgb(15 23 42 / 0.78); color: #fff; font-size: 0.64rem; font-weight: 700; backdrop-filter: blur(5px); }
+.image-zoom-hint svg { width: 0.86rem; height: 0.86rem; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
+.room-gallery.has-thumbnails .room-image { height: 8rem; min-height: 8rem; max-height: 8rem; }
+.room-thumbnails { display: flex; gap: 0.36rem; padding: 0.1rem 0.12rem 0.18rem; overflow-x: auto; scrollbar-width: thin; }
+.room-thumbnail { width: 4.2rem; height: 3rem; flex: 0 0 auto; padding: 0; overflow: hidden; border: 2px solid transparent; border-radius: 8px; background: var(--dt-surface-alt); cursor: pointer; transition: border-color 140ms ease-out, transform 140ms ease-out; }
+.room-thumbnail:hover { border-color: color-mix(in srgb, var(--dt-blue) 45%, var(--dt-border)); transform: translateY(-1px); }
+.room-thumbnail:focus-visible { outline: 2px solid var(--dt-blue); outline-offset: 2px; }
+.room-thumbnail.selected { border-color: var(--dt-blue); box-shadow: 0 2px 7px rgb(37 99 235 / 0.2); }
+.room-thumbnail img { width: 100%; height: 100%; object-fit: cover; }
 .image-empty { display: flex; flex-direction: column; align-items: center; gap: 0.35rem; color: var(--dt-soft); font-size: 0.68rem; }
 .image-empty svg { width: 2.25rem; height: 2.25rem; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+
+.room-lightbox { width: min(92vw, 72rem); max-width: none; height: min(90dvh, 52rem); max-height: none; padding: 0; overflow: hidden; border: 0; border-radius: 14px; background: #0b1120; color: #fff; box-shadow: 0 24px 70px rgb(0 0 0 / 0.45); }
+.room-lightbox::backdrop { background: rgb(2 6 23 / 0.82); backdrop-filter: blur(5px); }
+.lightbox-shell { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; height: 100%; }
+.lightbox-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.72rem 0.82rem; background: #111827; }
+.lightbox-header h2 { margin: 0; color: #fff; font-size: 1rem; }
+.lightbox-header p { margin: 0.08rem 0 0; color: #cbd5e1; font-size: 0.72rem; }
+.lightbox-close,
+.lightbox-nav { display: inline-flex; align-items: center; justify-content: center; border: 0; color: #fff; cursor: pointer; }
+.lightbox-close { width: 2.35rem; height: 2.35rem; flex: 0 0 auto; border-radius: 9px; background: rgb(255 255 255 / 0.1); }
+.lightbox-close:hover { background: rgb(255 255 255 / 0.18); }
+.lightbox-close:focus-visible,
+.lightbox-nav:focus-visible,
+.lightbox-thumbnails button:focus-visible { outline: 2px solid #93c5fd; outline-offset: 2px; }
+.lightbox-close svg,
+.lightbox-nav svg { width: 1.35rem; height: 1.35rem; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.lightbox-stage { position: relative; display: flex; align-items: center; justify-content: center; min-height: 0; padding: 0.8rem 4rem; overflow: hidden; }
+.lightbox-stage > img { width: 100%; height: 100%; object-fit: contain; }
+.lightbox-nav { position: absolute; z-index: 1; top: 50%; width: 2.8rem; height: 3.8rem; border-radius: 10px; background: rgb(255 255 255 / 0.12); transform: translateY(-50%); }
+.lightbox-nav:hover { background: rgb(255 255 255 / 0.22); }
+.lightbox-nav.previous { left: 0.7rem; }
+.lightbox-nav.next { right: 0.7rem; }
+.lightbox-error { color: #cbd5e1; font-size: 0.82rem; }
+.lightbox-thumbnails { display: flex; justify-content: center; gap: 0.42rem; min-height: 4.7rem; padding: 0.55rem 0.75rem 0.7rem; overflow-x: auto; background: #111827; scrollbar-width: thin; }
+.lightbox-thumbnails button { width: 4.7rem; height: 3.35rem; flex: 0 0 auto; padding: 0; overflow: hidden; border: 2px solid transparent; border-radius: 8px; background: #1e293b; cursor: pointer; opacity: 0.68; }
+.lightbox-thumbnails button:hover { opacity: 1; }
+.lightbox-thumbnails button.selected { border-color: #60a5fa; opacity: 1; }
+.lightbox-thumbnails img { width: 100%; height: 100%; object-fit: cover; }
 .room-facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 0.4rem 0 0; border-block: 1px solid var(--dt-border); }
 .room-facts div { min-width: 0; padding: 0.36rem 0.28rem; text-align: center; }
 .room-facts div + div { border-left: 1px solid var(--dt-border); }
@@ -988,7 +1249,6 @@ onUnmounted(() => {
 .calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); grid-template-rows: minmax(2.1rem, auto) repeat(6, minmax(1.55rem, 1fr)); gap: 0.28rem; height: calc(100% - 3.25rem); min-height: 0; }
 .weekday { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 0; padding: 0.24rem 0.15rem; border-radius: 10px; background: var(--dt-blue-soft); color: var(--dt-text); text-align: center; }
 .weekday b { font-size: 0.76rem; line-height: 1; }
-.weekday small { margin-top: 0.16rem; font-size: 0.6rem; line-height: 1; font-weight: 650; }
 .weekday.sunday { background: var(--dt-red-soft); color: var(--dt-red); }
 .weekday.saturday { background: var(--dt-green-soft); color: var(--dt-green); }
 .day-cell { position: relative; display: flex; align-items: center; justify-content: center; min-width: 0; min-height: 0; border: 1px solid var(--dt-border); border-radius: 10px; background: var(--dt-surface); color: var(--dt-text); font: inherit; font-size: 0.86rem; font-weight: 700; font-variant-numeric: tabular-nums; cursor: pointer; transition: border-color 140ms ease-out, background-color 140ms ease-out, transform 140ms ease-out; }
@@ -1048,7 +1308,10 @@ onUnmounted(() => {
 @media (max-width: 620px) {
   .dashboard-test-page { gap: 0.46rem; min-height: calc(100dvh - 3.35rem); padding: 0.46rem; }
   .overview-main { min-height: 0; grid-template-rows: auto auto auto; }
-  .time-strip { min-height: 3.2rem; }
+  .time-strip { min-height: 3.2rem; padding-inline: 0.48rem; }
+  .time-icon { width: 2.1rem; height: 2.1rem; }
+  .time-label { font-size: 1.65rem; }
+  .live-indicator { font-size: 0.66rem; }
   .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .kpi-card { min-height: 4.25rem; }
   .status-panel { min-height: 23rem; }
@@ -1068,7 +1331,6 @@ onUnmounted(() => {
   .calendar-controls button { width: 1.8rem; height: 1.8rem; }
   .calendar-controls .today-button { padding-inline: 0.48rem; }
   .calendar-grid { grid-template-rows: 2.15rem repeat(6, minmax(2.2rem, 1fr)); gap: 0.2rem; height: calc(100% - 3rem); }
-  .weekday small { display: none; }
   .day-cell { border-radius: 8px; font-size: 0.78rem; }
   .schedule-list { max-height: none; }
 }

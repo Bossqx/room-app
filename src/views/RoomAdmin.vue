@@ -4,6 +4,10 @@ import config from '../assets/config.json'
 
 const apiBase = (config.apiRoute ?? 'http://localhost:8000').replace(/\/$/, '')
 
+interface RoomImage {
+  image: string
+}
+
 interface Room {
   id: number
   room_no: string
@@ -13,11 +17,116 @@ interface Room {
   building: string | null
   computer_no: number | null
   seat_no: number | null
+  images?: RoomImage[]
 }
 
 const rooms      = ref<Room[]>([])
 const listState  = ref<'idle' | 'loading' | 'error'>('idle')
 const listErrMsg = ref('')
+const imageVersion = ref(0)
+const previewImage = ref<{ src: string; alt: string } | null>(null)
+const deletingImagePath = ref<string | null>(null)
+const imageDeleteState = ref<'idle' | 'loading' | 'error' | 'done'>('idle')
+const imageDeleteMessage = ref('')
+const imageManagerRoom = ref<Room | null>(null)
+const deletingPanoramaRoom = ref<string | null>(null)
+const panoramaDeleteState = ref<'idle' | 'loading' | 'error' | 'done'>('idle')
+const panoramaDeleteMessage = ref('')
+
+function panoramaUrl(room: Room): string {
+  return `${apiBase}/room/get_panorama/${encodeURIComponent(room.room_no)}?v=${imageVersion.value}`
+}
+
+function roomImageUrl(imagePath: string): string {
+  return `${apiBase}/room/get_room_image/${encodeURIComponent(imagePath)}?v=${imageVersion.value}`
+}
+
+function openImagePreview(src: string, alt: string) {
+  previewImage.value = { src, alt }
+}
+
+function closeImagePreview() {
+  previewImage.value = null
+}
+
+function openImageManager(room: Room) {
+  imageManagerRoom.value = room
+  imageUploadState.value = 'idle'
+  imageErrMsg.value = ''
+  imageDeleteState.value = 'idle'
+  imageDeleteMessage.value = ''
+  panoramaDeleteState.value = 'idle'
+  panoramaDeleteMessage.value = ''
+}
+
+function closeImageManager() {
+  if (deletingImagePath.value !== null || deletingPanoramaRoom.value !== null || imageUploadState.value === 'loading') return
+  imageManagerRoom.value = null
+}
+
+async function deleteRoomImage(room: Room, item: RoomImage, index: number) {
+  if (deletingImagePath.value !== null) return
+  if (!confirm(`ลบภาพที่ ${index + 1} ของห้อง ${room.room_no} หรือไม่?\nเมื่อลบแล้วจะกู้คืนไม่ได้`)) return
+
+  deletingImagePath.value = item.image
+  imageDeleteState.value = 'loading'
+  imageDeleteMessage.value = ''
+
+  try {
+    const res = await fetch(`${apiBase}/room/delete_image/${encodeURIComponent(item.image)}`, {
+      method: 'DELETE',
+    })
+
+    if (!res.ok) {
+      if (res.status === 404 || res.status === 405) {
+        throw new Error('เซิร์ฟเวอร์ยังไม่รองรับ API สำหรับลบรูป')
+      }
+      throw new Error(`เซิร์ฟเวอร์ตอบกลับ HTTP ${res.status}`)
+    }
+
+    room.images = room.images?.filter(image => image.image !== item.image) ?? []
+    imageVersion.value += 1
+    imageDeleteState.value = 'done'
+    imageDeleteMessage.value = `ลบภาพที่ ${index + 1} ของห้อง ${room.room_no} แล้ว`
+  } catch (e) {
+    imageDeleteState.value = 'error'
+    imageDeleteMessage.value = e instanceof Error ? e.message : 'ไม่สามารถลบรูปได้ กรุณาลองใหม่'
+  } finally {
+    deletingImagePath.value = null
+  }
+}
+
+async function deletePanorama(room: Room) {
+  if (deletingPanoramaRoom.value !== null) return
+  if (!confirm(`ลบ Panorama ของห้อง ${room.room_no} หรือไม่?\nเมื่อลบแล้วจะกู้คืนไม่ได้`)) return
+
+  deletingPanoramaRoom.value = room.room_no
+  panoramaDeleteState.value = 'loading'
+  panoramaDeleteMessage.value = ''
+
+  try {
+    const res = await fetch(`${apiBase}/room/delete_panorama/${encodeURIComponent(room.room_no)}`, {
+      method: 'DELETE',
+    })
+
+    if (!res.ok) {
+      if (res.status === 404 || res.status === 405) {
+        throw new Error('เซิร์ฟเวอร์ยังไม่รองรับ API สำหรับลบ Panorama')
+      }
+      throw new Error(`เซิร์ฟเวอร์ตอบกลับ HTTP ${res.status}`)
+    }
+
+    room.panorama = null
+    imageVersion.value += 1
+    panoramaDeleteState.value = 'done'
+    panoramaDeleteMessage.value = `ลบ Panorama ของห้อง ${room.room_no} แล้ว`
+  } catch (e) {
+    panoramaDeleteState.value = 'error'
+    panoramaDeleteMessage.value = e instanceof Error ? e.message : 'ไม่สามารถลบ Panorama ได้ กรุณาลองใหม่'
+  } finally {
+    deletingPanoramaRoom.value = null
+  }
+}
 
 async function fetchRooms() {
   listState.value  = 'loading'
@@ -25,7 +134,17 @@ async function fetchRooms() {
   try {
     const res = await fetch(`${apiBase}/room/get_all_rooms`)
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    rooms.value = await res.json()
+    const roomList: Room[] = await res.json()
+    rooms.value = await Promise.all(roomList.map(async room => {
+      try {
+        const detailRes = await fetch(`${apiBase}/room/get_room/${encodeURIComponent(room.room_no)}`)
+        if (!detailRes.ok) return { ...room, images: [] }
+        const detail = await detailRes.json() as Room
+        return { ...room, ...detail, images: Array.isArray(detail.images) ? detail.images : [] }
+      } catch {
+        return { ...room, images: [] }
+      }
+    }))
     listState.value = 'idle'
   } catch (e) {
     listState.value  = 'error'
@@ -191,6 +310,7 @@ function onPanoFileSelect(e: Event) {
 
 async function uploadPanoramaFile(file: File) {
   if (!panoRoom.value) return
+  const roomNo = panoRoom.value.room_no
   if (!/\.(png|jpe?g)$/i.test(file.name)) {
     panoState.value  = 'error'
     panoErrMsg.value = 'Only PNG and JPG files are allowed.'
@@ -202,13 +322,17 @@ async function uploadPanoramaFile(file: File) {
   try {
     const body = new FormData()
     body.append('file', file)
-    const res = await fetch(`${apiBase}/room/upload_panorama/${panoRoom.value.room_no}`, {
+    const res = await fetch(`${apiBase}/room/upload_panorama/${roomNo}`, {
       method: 'POST',
       body,
     })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     panoState.value = 'done'
+    imageVersion.value += 1
     await fetchRooms()
+    if (imageManagerRoom.value?.room_no === roomNo) {
+      imageManagerRoom.value = rooms.value.find(room => room.room_no === roomNo) ?? null
+    }
     setTimeout(() => { showPanoModal.value = false }, 700)
   } catch (e) {
     panoState.value  = 'error'
@@ -255,6 +379,11 @@ async function onImageFileSelect(e: Event) {
     })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     imageUploadState.value = 'done'
+    imageVersion.value += 1
+    await fetchRooms()
+    if (imageManagerRoom.value?.room_no === roomNo) {
+      imageManagerRoom.value = rooms.value.find(room => room.room_no === roomNo) ?? null
+    }
   } catch (e) {
     imageUploadState.value = 'error'
     imageErrMsg.value      = `Failed to upload image for ${roomNo}: ${e}`
@@ -434,12 +563,13 @@ async function toggleAccessory(item: AccessoryItem) {
             <th>PCs</th>
             <th>Seats</th>
             <th>Panorama</th>
+            <th>Images</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody>
           <tr v-if="rooms.length === 0">
-            <td colspan="8" class="empty">No rooms found.</td>
+            <td colspan="9" class="empty">No rooms found.</td>
           </tr>
           <tr v-for="room in rooms" :key="room.id">
             <td>{{ room.room_no }}</td>
@@ -448,10 +578,33 @@ async function toggleAccessory(item: AccessoryItem) {
             <td>{{ room.building ?? '—' }}</td>
             <td>{{ room.computer_no ?? '—' }}</td>
             <td>{{ room.seat_no ?? '—' }}</td>
-            <td>
-              <span class="badge" :class="room.panorama ? 'badge-active' : 'badge-inactive'">
-                {{ room.panorama ? 'Set' : 'Not set' }}
-              </span>
+            <td class="media-cell">
+              <button
+                v-if="room.panorama"
+                type="button"
+                class="image-thumbnail panorama-thumbnail"
+                :aria-label="`ดูภาพ Panorama ห้อง ${room.room_no}`"
+                @click="openImagePreview(panoramaUrl(room), `Panorama ห้อง ${room.room_no}`)"
+              >
+                <img :src="panoramaUrl(room)" :alt="`Panorama ห้อง ${room.room_no}`" loading="lazy" />
+              </button>
+              <span v-else class="badge badge-inactive">Not set</span>
+            </td>
+            <td class="media-cell">
+              <div v-if="room.images?.length" class="image-thumbnails">
+                <button
+                  v-for="(item, index) in room.images.slice(0, 3)"
+                  :key="item.image"
+                  type="button"
+                  class="image-thumbnail"
+                  :aria-label="`ดูภาพห้อง ${room.room_no} ภาพที่ ${index + 1}`"
+                  @click="openImagePreview(roomImageUrl(item.image), `ห้อง ${room.room_no} ภาพที่ ${index + 1}`)"
+                >
+                  <img :src="roomImageUrl(item.image)" :alt="`ห้อง ${room.room_no} ภาพที่ ${index + 1}`" loading="lazy" />
+                </button>
+                <span v-if="room.images.length > 3" class="image-count">+{{ room.images.length - 3 }}</span>
+              </div>
+              <span v-else class="badge badge-inactive">No images</span>
             </td>
             <td>
               <div class="actions">
@@ -464,14 +617,8 @@ async function toggleAccessory(item: AccessoryItem) {
                 >
                   {{ deletingId === room.id ? 'Deleting…' : 'Delete' }}
                 </button>
-                <button type="button" class="action-btn" @click="openPanoModal(room)">Panorama</button>
-                <button
-                  type="button"
-                  class="action-btn"
-                  :disabled="imageUploadState === 'loading' && imageTargetRoom === room.room_no"
-                  @click="triggerImageUpload(room)"
-                >
-                  {{ imageUploadState === 'loading' && imageTargetRoom === room.room_no ? 'Uploading…' : '+ Image' }}
+                <button type="button" class="action-btn" @click="openImageManager(room)">
+                  Media ({{ (room.panorama ? 1 : 0) + (room.images?.length ?? 0) }})
                 </button>
                 <button type="button" class="action-btn" @click="openAppModal(room)">Applications</button>
                 <button type="button" class="action-btn" @click="openAccessoryModal(room)">Accessory</button>
@@ -481,8 +628,6 @@ async function toggleAccessory(item: AccessoryItem) {
         </tbody>
       </table>
 
-      <div v-if="imageUploadState === 'error'" class="msg error-box">{{ imageErrMsg }}</div>
-      <div v-else-if="imageUploadState === 'done'" class="msg ok-box">Image uploaded successfully.</div>
     </div>
 
     <!-- Hidden input shared by the "+ Image" buttons -->
@@ -493,6 +638,119 @@ async function toggleAccessory(item: AccessoryItem) {
       class="hidden-input"
       @change="onImageFileSelect"
     />
+
+    <!-- Room image manager -->
+    <Teleport to="body">
+      <div v-if="imageManagerRoom" class="overlay" @click.self="closeImageManager">
+        <div class="modal image-manager-modal" role="dialog" aria-modal="true" aria-labelledby="image-manager-title">
+          <button class="modal-close" aria-label="ปิดหน้าต่างจัดการรูป" @click="closeImageManager">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+            </svg>
+          </button>
+
+          <div class="image-manager-heading">
+            <div>
+              <p id="image-manager-title" class="card-title">Manage Media — {{ imageManagerRoom.room_no }}</p>
+              <p>Panorama and {{ imageManagerRoom.images?.length ?? 0 }} room images</p>
+            </div>
+          </div>
+
+          <section class="media-manager-section" aria-labelledby="panorama-manager-title">
+            <div class="media-manager-section-heading">
+              <div>
+                <h3 id="panorama-manager-title">Panorama</h3>
+                <p>ภาพมุมกว้างหลักของห้อง</p>
+              </div>
+              <button type="button" class="action-btn" @click="openPanoModal(imageManagerRoom)">
+                {{ imageManagerRoom.panorama ? 'Replace Panorama' : '+ Add Panorama' }}
+              </button>
+            </div>
+
+            <div v-if="imageManagerRoom.panorama" class="managed-panorama-card">
+              <button
+                type="button"
+                class="managed-panorama-preview"
+                :aria-label="`ดู Panorama ห้อง ${imageManagerRoom.room_no}`"
+                @click="openImagePreview(panoramaUrl(imageManagerRoom), `Panorama ห้อง ${imageManagerRoom.room_no}`)"
+              >
+                <img :src="panoramaUrl(imageManagerRoom)" :alt="`Panorama ห้อง ${imageManagerRoom.room_no}`" />
+              </button>
+              <button
+                type="button"
+                class="managed-image-delete"
+                :disabled="deletingPanoramaRoom !== null"
+                @click="deletePanorama(imageManagerRoom)"
+              >
+                <span v-if="deletingPanoramaRoom === imageManagerRoom.room_no" class="mini-spinner" aria-hidden="true" />
+                <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v5m4-5v5" /></svg>
+                {{ deletingPanoramaRoom === imageManagerRoom.room_no ? 'Deleting…' : 'Delete Panorama' }}
+              </button>
+            </div>
+            <div v-else class="panorama-empty">No panorama uploaded.</div>
+
+            <div v-if="panoramaDeleteState === 'error'" class="msg error-box" role="alert">{{ panoramaDeleteMessage }}</div>
+            <div v-else-if="panoramaDeleteState === 'done'" class="msg ok-box" role="status">{{ panoramaDeleteMessage }}</div>
+          </section>
+
+          <section class="media-manager-section" aria-labelledby="room-images-manager-title">
+            <div class="media-manager-section-heading">
+              <div>
+                <h3 id="room-images-manager-title">Room Images</h3>
+                <p>{{ imageManagerRoom.images?.length ?? 0 }} uploaded images</p>
+              </div>
+            <button
+              type="button"
+              class="btn image-manager-add"
+              :disabled="imageUploadState === 'loading'"
+              @click="triggerImageUpload(imageManagerRoom)"
+            >
+              <span v-if="imageUploadState === 'loading'" class="spinner" aria-hidden="true" />
+              {{ imageUploadState === 'loading' ? 'Uploading…' : '+ Add Image' }}
+            </button>
+          </div>
+
+          <div v-if="!imageManagerRoom.images?.length" class="image-manager-empty">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM4 15l4-4 4 4 3-3 5 5M9 9h.01" /></svg>
+            <p>No uploaded images.</p>
+            <span>Use “Add Image” to upload the first image for this room.</span>
+          </div>
+
+          <div v-else class="image-manager-grid">
+            <article v-for="(item, index) in imageManagerRoom.images" :key="item.image" class="managed-image-card">
+              <button
+                type="button"
+                class="managed-image-preview"
+                :aria-label="`ดูภาพที่ ${index + 1} ของห้อง ${imageManagerRoom.room_no}`"
+                @click="openImagePreview(roomImageUrl(item.image), `ห้อง ${imageManagerRoom.room_no} ภาพที่ ${index + 1}`)"
+              >
+                <img :src="roomImageUrl(item.image)" :alt="`ห้อง ${imageManagerRoom.room_no} ภาพที่ ${index + 1}`" loading="lazy" />
+              </button>
+              <footer>
+                <span>Image {{ index + 1 }}</span>
+                <button
+                  type="button"
+                  class="managed-image-delete"
+                  :disabled="deletingImagePath !== null"
+                  :aria-label="`ลบภาพที่ ${index + 1} ของห้อง ${imageManagerRoom.room_no}`"
+                  @click="deleteRoomImage(imageManagerRoom, item, index)"
+                >
+                  <span v-if="deletingImagePath === item.image" class="mini-spinner" aria-hidden="true" />
+                  <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v5m4-5v5" /></svg>
+                  {{ deletingImagePath === item.image ? 'Deleting…' : 'Delete' }}
+                </button>
+              </footer>
+            </article>
+          </div>
+
+          <div v-if="imageUploadState === 'error'" class="msg error-box" role="alert">{{ imageErrMsg }}</div>
+          <div v-else-if="imageUploadState === 'done'" class="msg ok-box" role="status">Image uploaded successfully.</div>
+          <div v-if="imageDeleteState === 'error'" class="msg error-box" role="alert">{{ imageDeleteMessage }}</div>
+          <div v-else-if="imageDeleteState === 'done'" class="msg ok-box" role="status">{{ imageDeleteMessage }}</div>
+          </section>
+        </div>
+      </div>
+    </Teleport>
 
     <!-- Add / edit room popup -->
     <Teleport to="body">
@@ -594,6 +852,21 @@ async function toggleAccessory(item: AccessoryItem) {
 
           <div v-if="panoState === 'error'" class="msg error-box">{{ panoErrMsg }}</div>
           <div v-else-if="panoState === 'done'" class="msg ok-box">Panorama uploaded successfully.</div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- Uploaded image preview -->
+    <Teleport to="body">
+      <div v-if="previewImage" class="overlay image-preview-overlay" @click.self="closeImagePreview">
+        <div class="image-preview-modal" role="dialog" aria-modal="true" :aria-label="previewImage.alt">
+          <button class="modal-close" aria-label="Close image preview" @click="closeImagePreview">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+            </svg>
+          </button>
+          <img :src="previewImage.src" :alt="previewImage.alt" class="preview-image" />
+          <p class="preview-caption">{{ previewImage.alt }}</p>
         </div>
       </div>
     </Teleport>
@@ -745,6 +1018,97 @@ async function toggleAccessory(item: AccessoryItem) {
   white-space: nowrap;
 }
 
+.media-cell {
+  width: 1%;
+  min-width: 5.5rem;
+  white-space: normal;
+}
+
+.image-thumbnails {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.18rem 0.1rem;
+}
+
+.image-thumbnail {
+  display: inline-flex;
+  width: 3rem;
+  height: 2.35rem;
+  flex: 0 0 auto;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 0.45rem;
+  background: var(--bg-page);
+  cursor: zoom-in;
+}
+
+.image-thumbnail:hover,
+.image-thumbnail:focus-visible {
+  border-color: var(--accent-link-hover);
+}
+
+.image-thumbnail:focus-visible {
+  outline: 2px solid var(--accent-link-hover);
+  outline-offset: 2px;
+}
+
+.image-thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.mini-spinner {
+  width: 0.55rem;
+  height: 0.55rem;
+  border: 1.5px solid rgba(255, 255, 255, 0.45);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.65s linear infinite;
+}
+
+.panorama-thumbnail {
+  width: 4.5rem;
+}
+
+.image-count {
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.modal.image-manager-modal { max-width: 760px; }
+.image-manager-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding-right: 2.5rem; }
+.image-manager-heading p { margin: 0.22rem 0 0; color: var(--text-secondary); font-size: 0.76rem; }
+.image-manager-add { flex: 0 0 auto; }
+.media-manager-section { margin-top: 1rem; padding-top: 0.9rem; border-top: 1px solid var(--border); }
+.media-manager-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.media-manager-section-heading h3 { margin: 0; color: var(--text-primary); font-size: 0.86rem; }
+.media-manager-section-heading p { margin: 0.15rem 0 0; color: var(--text-secondary); font-size: 0.72rem; }
+.managed-panorama-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 0.75rem; margin-top: 0.65rem; padding: 0.55rem; border: 1px solid var(--border); border-radius: 0.7rem; background: var(--bg-page); }
+.managed-panorama-preview { display: block; width: 100%; height: 7rem; padding: 0; overflow: hidden; border: 0; border-radius: 0.5rem; background: var(--bg-surface-alt); cursor: zoom-in; }
+.managed-panorama-preview img { width: 100%; height: 100%; object-fit: cover; }
+.managed-panorama-preview:focus-visible { outline: 2px solid var(--accent-link-hover); outline-offset: 2px; }
+.panorama-empty { margin-top: 0.65rem; padding: 1rem; border: 1px dashed var(--border); border-radius: 0.7rem; background: var(--bg-page); color: var(--text-secondary); font-size: 0.76rem; text-align: center; }
+.image-manager-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: 0.8rem; margin-top: 1rem; }
+.managed-image-card { min-width: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 0.7rem; background: var(--bg-page); }
+.managed-image-preview { display: block; width: 100%; height: 8.2rem; padding: 0; overflow: hidden; border: 0; background: var(--bg-surface-alt); cursor: zoom-in; }
+.managed-image-preview img { width: 100%; height: 100%; object-fit: cover; }
+.managed-image-preview:focus-visible { outline: 2px solid var(--accent-link-hover); outline-offset: -3px; }
+.managed-image-card footer { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.55rem 0.62rem; }
+.managed-image-card footer > span { overflow: hidden; color: var(--text-secondary); font-size: 0.74rem; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.managed-image-delete { display: inline-flex; align-items: center; gap: 0.28rem; flex: 0 0 auto; padding: 0.3rem 0.48rem; border: 1px solid rgba(239, 68, 68, 0.35); border-radius: 0.4rem; background: rgba(239, 68, 68, 0.08); color: var(--pill-error-text); font: inherit; font-size: 0.7rem; font-weight: 700; cursor: pointer; }
+.managed-image-delete:hover:not(:disabled) { background: rgba(239, 68, 68, 0.16); }
+.managed-image-delete:focus-visible { outline: 2px solid #ef4444; outline-offset: 2px; }
+.managed-image-delete:disabled { cursor: wait; opacity: 0.65; }
+.managed-image-delete svg { width: 0.82rem; height: 0.82rem; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.image-manager-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 13rem; margin-top: 1rem; border: 1px dashed var(--border); border-radius: 0.7rem; background: var(--bg-page); color: var(--text-secondary); text-align: center; }
+.image-manager-empty svg { width: 2.8rem; height: 2.8rem; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+.image-manager-empty p { margin: 0.65rem 0 0.15rem; color: var(--text-primary); font-weight: 700; }
+.image-manager-empty span { font-size: 0.76rem; }
+
 .empty {
   text-align: center;
   color: #64748b;
@@ -782,6 +1146,38 @@ async function toggleAccessory(item: AccessoryItem) {
 }
 .badge-active   { background: rgba(34,197,94,.12);  color: var(--pill-success-text); }
 .badge-inactive { background: rgba(148,163,184,.15); color: var(--text-secondary); }
+
+.image-preview-overlay {
+  padding: 1.5rem;
+}
+
+.image-preview-modal {
+  position: relative;
+  width: min(72rem, 94vw);
+  max-height: 90vh;
+  padding: 2.75rem 1rem 1rem;
+  overflow: hidden;
+  border-radius: 0.9rem;
+  background: var(--bg-surface);
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.35);
+}
+
+.preview-image {
+  display: block;
+  width: 100%;
+  max-height: calc(90vh - 6rem);
+  border-radius: 0.6rem;
+  object-fit: contain;
+  background: var(--bg-page);
+}
+
+.preview-caption {
+  margin: 0.65rem 0 0;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  font-weight: 650;
+  text-align: center;
+}
 
 .form {
   display: flex;
@@ -1003,5 +1399,13 @@ async function toggleAccessory(item: AccessoryItem) {
 @media (max-width: 720px) {
   .field-row { flex-direction: column; }
   .table { font-size: 0.78rem; }
+  .image-manager-heading { align-items: flex-start; flex-direction: column; }
+  .media-manager-section-heading { align-items: flex-start; flex-direction: column; }
+  .managed-panorama-card { grid-template-columns: 1fr; }
+  .image-manager-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 460px) {
+  .image-manager-grid { grid-template-columns: 1fr; }
 }
 </style>
