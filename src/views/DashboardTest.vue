@@ -79,6 +79,7 @@ interface RoomStatusView {
   tone: RoomTone;
   label: string;
   context: string;
+  subjectName?: string;
 }
 
 interface CalendarDay {
@@ -322,6 +323,7 @@ const nowMinutes = computed(() => now.value.getHours() * 60 + now.value.getMinut
 
 const roomStatuses = computed<RoomStatusView[]>(() => {
   const summary = dashboard.value;
+  const today = localDateKey(now.value);
   const codes = new Set(rooms.value.map((room) => room.room_no));
   summary?.list_empty_rooms.forEach((slot) => codes.add(slot.roomcode));
   summary?.list_usage_rooms.forEach((slot) => codes.add(slot.roomcode));
@@ -334,16 +336,25 @@ const roomStatuses = computed<RoomStatusView[]>(() => {
     const usageSlots = (summary?.list_usage_rooms ?? [])
       .filter((slot) => sameRoom(slot.roomcode, roomcode))
       .sort((left, right) => left.startTime.localeCompare(right.startTime));
+    const todayRoomSchedules = schedules.value
+      .filter((item) => sameRoom(item.roomcode ?? "", roomcode) && item.schedule_date?.slice(0, 10) === today)
+      .sort((left, right) => left.startTime.localeCompare(right.startTime));
     const activeUsage = usageSlots.find((slot) =>
       nowMinutes.value >= toMinutes(slot.startTime) && nowMinutes.value <= toMinutes(slot.finishTime));
     if (activeUsage) {
       const pending = !Number.isNaN(Number(activeUsage.usageStatus)) && Number(activeUsage.usageStatus) < 3;
+      const activeSchedule = todayRoomSchedules.find((item) =>
+        toMinutes(item.startTime) === toMinutes(activeUsage.startTime)
+        && toMinutes(item.finishTime) === toMinutes(activeUsage.finishTime))
+        ?? todayRoomSchedules.find((item) =>
+          nowMinutes.value >= toMinutes(item.startTime) && nowMinutes.value <= toMinutes(item.finishTime));
       return {
         roomcode,
         floorNo,
         tone: pending ? "scheduled" : "busy",
         label: pending ? "มีตาราง—ยังไม่ยืนยัน" : "กำลังใช้งาน",
         context: `ถึง ${activeUsage.finishTime} น.`,
+        subjectName: activeSchedule ? scheduleCourseName(activeSchedule) : undefined,
       };
     }
 
@@ -357,7 +368,16 @@ const roomStatuses = computed<RoomStatusView[]>(() => {
 
     const nextUsage = usageSlots.find((slot) => toMinutes(slot.startTime) > nowMinutes.value);
     if (nextUsage) {
-      return { roomcode, floorNo, tone: "scheduled", label: "มีตารางวันนี้", context: `รายการถัดไป ${nextUsage.startTime} น.` };
+      const nextSchedule = todayRoomSchedules.find((item) =>
+        toMinutes(item.startTime) === toMinutes(nextUsage.startTime));
+      return {
+        roomcode,
+        floorNo,
+        tone: "scheduled",
+        label: "มีตารางวันนี้",
+        context: `รายการถัดไป ${nextUsage.startTime} น.`,
+        subjectName: nextSchedule ? scheduleCourseName(nextSchedule) : undefined,
+      };
     }
 
     return { roomcode, floorNo, tone: "unknown", label: "ไม่มีข้อมูลสถานะ", context: "ไม่มีรายการถัดไปวันนี้" };
@@ -474,6 +494,7 @@ function roomAriaLabel(room: RoomStatusView): string {
     `สถานะ ${room.label}`,
     room.context,
   ];
+  if (room.subjectName) segments.push(`วิชา ${room.subjectName}`);
   const count = personCount(room.roomcode);
   if (count !== undefined) segments.push(`ตรวจพบผู้ใช้ ${count} คน`);
   return segments.filter(Boolean).join(", ");
@@ -589,7 +610,11 @@ function calendarDayLabel(day: CalendarDay): string {
 }
 
 function scheduleTitle(item: ScheduleRecord): string {
-  return item.coursename || item.subject_name || item.coursecode || item.subject_code || item.objective || "รายการจอง";
+  return scheduleCourseName(item) || item.objective || "รายการจอง";
+}
+
+function scheduleCourseName(item: ScheduleRecord): string {
+  return item.coursename || item.subject_name || item.coursecode || item.subject_code || "";
 }
 
 function scheduleOwner(item: ScheduleRecord): string {
@@ -727,12 +752,19 @@ onUnmounted(() => {
               @click="toggleRoomSelection(room.roomcode)"
             >
               <span class="room-card-head">
-                <strong>{{ room.roomcode }}</strong>
-                <span class="room-floor">ชั้น {{ room.floorNo ?? "—" }}</span>
+                <span class="room-title">
+                  <strong>{{ room.roomcode }}</strong>
+                  <span class="room-floor">ชั้น {{ room.floorNo ?? "—" }}</span>
+                </span>
                 <i class="status-dot" aria-hidden="true" />
               </span>
-              <span class="room-state-text">{{ room.label }}</span>
-              <span class="room-context">{{ room.context }}</span>
+              <span class="room-status-line">
+                <span class="room-state-text">{{ room.label }}</span>
+                <span class="room-context">{{ room.context }}</span>
+              </span>
+              <span v-if="room.subjectName" class="room-subject" :title="room.subjectName">
+                {{ room.subjectName }}
+              </span>
               <span v-if="personCount(room.roomcode) !== undefined" class="people-count">
                 ตรวจพบ {{ personCount(room.roomcode) }} คน
               </span>
@@ -1156,17 +1188,17 @@ onUnmounted(() => {
 .tone-scheduled { color: var(--dt-amber); }
 .tone-unknown { color: var(--dt-gray); }
 
-.room-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.32rem; min-width: 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
-.room-card { position: relative; display: flex; flex-direction: column; align-items: stretch; min-width: 0; min-height: 4.1rem; padding: 0.42rem 0.52rem; overflow: hidden; border: 1px solid var(--dt-border); border-left-width: 2px; border-radius: 10px; background: var(--dt-surface); color: var(--dt-text); text-align: left; font: inherit; cursor: pointer; transition: border-color 140ms ease-out, background-color 140ms ease-out, box-shadow 140ms ease-out; }
+.room-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.32rem; min-width: 0; min-height: 0; padding-top: 1px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+.room-card { position: relative; display: flex; flex-direction: column; align-items: stretch; min-width: 0; min-height: 4.1rem; padding: 0.42rem 0.52rem; overflow: hidden; border: 1px solid var(--dt-border); border-left-width: 4px; border-radius: 10px; background: var(--dt-surface); color: var(--dt-text); text-align: left; font: inherit; cursor: pointer; transition: border-color 140ms ease-out, background-color 140ms ease-out, box-shadow 140ms ease-out; }
 .room-card:hover { border-color: color-mix(in srgb, var(--dt-blue) 55%, var(--dt-border)); background: var(--dt-blue-soft); }
 .room-card:focus-visible,
 .calendar-controls button:focus-visible,
 .day-cell:focus-visible,
 .panel-state button:focus-visible { outline: 2px solid var(--dt-blue); outline-offset: 2px; }
-.room-card.tone-free { border-left-color: color-mix(in srgb, var(--dt-green) 48%, var(--dt-border)); }
-.room-card.tone-busy { border-left-color: color-mix(in srgb, var(--dt-red) 48%, var(--dt-border)); }
-.room-card.tone-scheduled { border-left-color: color-mix(in srgb, var(--dt-amber) 48%, var(--dt-border)); }
-.room-card.tone-unknown { border-left-color: color-mix(in srgb, var(--dt-gray) 48%, var(--dt-border)); }
+.room-card.tone-free { border-left-color: color-mix(in srgb, var(--dt-green) 68%, var(--dt-border)); }
+.room-card.tone-busy { border-left-color: color-mix(in srgb, var(--dt-red) 68%, var(--dt-border)); }
+.room-card.tone-scheduled { border-left-color: color-mix(in srgb, var(--dt-amber) 68%, var(--dt-border)); }
+.room-card.tone-unknown { border-left-color: color-mix(in srgb, var(--dt-gray) 68%, var(--dt-border)); }
 .room-card.selected { border-color: var(--dt-blue); background: var(--dt-blue); color: #fff; box-shadow: 0 3px 9px rgb(37 99 235 / 0.24); }
 .room-card.tone-free .status-dot,
 .room-card.tone-free .room-state-text { color: var(--dt-green); }
@@ -1180,14 +1212,20 @@ onUnmounted(() => {
 .room-card.selected .status-dot,
 .room-card.selected .room-state-text,
 .room-card.selected .room-context,
+.room-card.selected .room-subject,
 .room-card.selected .people-count { color: #fff; }
-.room-card-head { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 0.42rem; }
-.room-card-head strong { overflow: hidden; font-size: 0.94rem; text-overflow: ellipsis; white-space: nowrap; }
+.room-card-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 0.42rem; }
+.room-title { display: flex; min-width: 0; align-items: center; gap: 0.32rem; }
+.room-card-head strong { min-width: 0; overflow: hidden; font-size: 0.94rem; text-overflow: ellipsis; white-space: nowrap; }
 .room-floor { padding: 0.12rem 0.34rem; border-radius: 6px; background: var(--dt-surface-alt); color: var(--dt-soft); font-size: 0.62rem; font-weight: 700; white-space: nowrap; }
 .status-dot { width: 0.52rem; height: 0.52rem; flex: 0 0 auto; border-radius: 50%; background: currentColor; }
-.room-state-text { margin-top: 0.09rem; overflow: hidden; font-size: 0.72rem; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
+.room-status-line { display: flex; min-width: 0; align-items: baseline; gap: 0.3rem; margin-top: 0.09rem; overflow: hidden; }
+.room-state-text { min-width: 0; overflow: hidden; font-size: 0.72rem; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
 .room-context,
+.room-subject,
 .people-count { margin-top: 0.04rem; overflow: hidden; color: var(--dt-muted); font-size: 0.66rem; text-overflow: ellipsis; white-space: nowrap; }
+.room-status-line .room-context { flex: 0 0 auto; margin-top: 0; margin-left: auto; }
+.room-subject { color: var(--dt-text); font-weight: 650; }
 .people-count { color: var(--dt-blue); font-weight: 650; }
 
 .panel-state,
