@@ -692,14 +692,9 @@ onUnmounted(() => {
 
         <section class="status-panel" aria-labelledby="room-status-title">
           <div class="section-heading">
-            <div class="status-title-group">
-              <span class="status-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h1M14 9h1M9 13h1M14 13h1M9 17h1M14 17h1" /></svg>
-              </span>
-              <div>
-                <h2 id="room-status-title">สถานะห้องแบบ Real-time</h2>
-                <p>เลือกห้องเพื่อดูรายละเอียดและกรองตาราง กดห้องเดิมอีกครั้งเพื่อดูทุกห้อง</p>
-              </div>
+            <div>
+              <h2 id="room-status-title">สถานะห้องแบบ Real-time</h2>
+              <p>เลือกห้องเพื่อดูรายละเอียดและกรองตาราง กดห้องเดิมอีกครั้งเพื่อดูทุกห้อง</p>
             </div>
             <div class="status-legend" aria-label="คำอธิบายสถานะ">
               <span><i class="tone-free" />ว่าง</span>
@@ -1122,23 +1117,24 @@ onUnmounted(() => {
 
 .kpi-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.38rem; min-width: 0; }
 .kpi-card { position: relative; display: grid; grid-template-columns: 2.4rem minmax(0, 1fr); align-items: center; gap: 0.46rem; min-width: 0; min-height: 4.25rem; padding: 0.4rem 0.58rem; overflow: hidden; }
+.kpi-card::after { position: absolute; inset: 0 0 auto; height: 2px; background: var(--kpi-accent); content: ""; }
 .kpi-icon { display: inline-flex; align-items: center; justify-content: center; width: 2.25rem; height: 2.25rem; border-radius: 10px; background: var(--kpi-soft); }
 .kpi-icon svg { width: 1.5rem; height: 1.5rem; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
 .kpi-card p { overflow: hidden; color: var(--dt-soft); font-size: 0.72rem; font-weight: 650; white-space: nowrap; text-overflow: ellipsis; }
 .kpi-card strong { display: block; margin-top: 0.01rem; font-size: 1.55rem; line-height: 1; font-variant-numeric: tabular-nums; }
 .kpi-card strong small { color: var(--dt-muted); font-size: 0.68rem; font-weight: 650; }
 .kpi-card div > span { display: block; margin-top: 0.11rem; overflow: hidden; color: var(--dt-soft); font-size: 0.66rem; white-space: nowrap; text-overflow: ellipsis; }
-.kpi-blue { --kpi-soft: var(--dt-blue-soft); }
-.kpi-green { --kpi-soft: var(--dt-green-soft); }
-.kpi-red { --kpi-soft: var(--dt-red-soft); }
-.kpi-amber { --kpi-soft: var(--dt-amber-soft); }
+.kpi-blue { --kpi-accent: var(--dt-blue); --kpi-soft: var(--dt-blue-soft); }
+.kpi-green { --kpi-accent: var(--dt-green); --kpi-soft: var(--dt-green-soft); }
+.kpi-red { --kpi-accent: var(--dt-red); --kpi-soft: var(--dt-red-soft); }
+.kpi-amber { --kpi-accent: var(--dt-amber); --kpi-soft: var(--dt-amber-soft); }
 .kpi-blue .kpi-icon { color: var(--dt-blue); }
 .kpi-green .kpi-icon { color: var(--dt-green); }
 .kpi-red .kpi-icon { color: var(--dt-red); }
 .kpi-amber .kpi-icon { color: var(--dt-amber); }
 
-.status-panel { display: flex; flex-direction: column; min-width: 0; min-height: 0; padding: 0.65rem 0.72rem 0.72rem; border-radius: 16px; }
-.section-heading { display: flex; align-items: center; justify-content: space-between; gap: 0.7rem; margin-bottom: 0.55rem; }
+.status-panel { display: flex; flex-direction: column; min-width: 0; min-height: 0; padding: 0.48rem; }
+.section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.7rem; margin-bottom: 0.34rem; }
 .section-heading h2,
 .detail-heading h2,
 .calendar-heading h2,
@@ -1157,17 +1153,18 @@ onUnmounted(() => {
 .tone-unknown { color: var(--dt-gray); }
 
 .room-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.32rem; min-width: 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
-.room-card { position: relative; display: flex; flex-direction: column; align-items: stretch; min-width: 0; min-height: 4.1rem; padding: 0.42rem 0.52rem; overflow: hidden; border: 1px solid var(--dt-border); border-left-width: 2px; border-radius: 10px; background: var(--dt-surface); color: var(--dt-text); text-align: left; font: inherit; cursor: pointer; transition: border-color 140ms ease-out, background-color 140ms ease-out, box-shadow 140ms ease-out; }
-.room-card:hover { border-color: color-mix(in srgb, var(--dt-blue) 55%, var(--dt-border)); background: var(--dt-blue-soft); }
+.room-card { position: relative; display: flex; flex-direction: column; align-items: stretch; min-width: 0; min-height: 4.1rem; padding: 0.38rem 0.52rem 0.38rem 0.7rem; overflow: hidden; border: 1px solid var(--dt-border); border-radius: 10px; background: var(--dt-surface); color: var(--dt-text); text-align: left; font: inherit; cursor: pointer; transition: transform 140ms ease-out, border-color 140ms ease-out, background-color 140ms ease-out; }
+.room-card::before { position: absolute; inset: 0 auto 0 0; width: 3px; background: currentColor; content: ""; }
+.room-card:hover { border-color: color-mix(in srgb, currentColor 55%, var(--dt-border)); background: var(--dt-surface-alt); transform: translateY(-1px); }
 .room-card:focus-visible,
 .calendar-controls button:focus-visible,
 .day-cell:focus-visible,
 .panel-state button:focus-visible { outline: 2px solid var(--dt-blue); outline-offset: 2px; }
-.room-card.tone-free { border-left-color: color-mix(in srgb, var(--dt-green) 48%, var(--dt-border)); }
-.room-card.tone-busy { border-left-color: color-mix(in srgb, var(--dt-red) 48%, var(--dt-border)); }
-.room-card.tone-scheduled { border-left-color: color-mix(in srgb, var(--dt-amber) 48%, var(--dt-border)); }
-.room-card.tone-unknown { border-left-color: color-mix(in srgb, var(--dt-gray) 48%, var(--dt-border)); }
-.room-card.selected { border-color: var(--dt-blue); background: var(--dt-blue); color: #fff; box-shadow: 0 3px 9px rgb(37 99 235 / 0.24); }
+.room-card.selected { border-color: var(--dt-blue); background: color-mix(in srgb, var(--dt-blue-soft) 52%, var(--dt-surface)); box-shadow: inset 0 0 0 1px var(--dt-blue); }
+.room-card.tone-free::before { color: var(--dt-green); }
+.room-card.tone-busy::before { color: var(--dt-red); }
+.room-card.tone-scheduled::before { color: var(--dt-amber); }
+.room-card.tone-unknown::before { color: var(--dt-gray); }
 .room-card.tone-free .status-dot,
 .room-card.tone-free .room-state-text { color: var(--dt-green); }
 .room-card.tone-busy .status-dot,
@@ -1176,11 +1173,6 @@ onUnmounted(() => {
 .room-card.tone-scheduled .room-state-text { color: var(--dt-amber); }
 .room-card.tone-unknown .status-dot,
 .room-card.tone-unknown .room-state-text { color: var(--dt-gray); }
-.room-card.selected .room-floor { background: rgb(255 255 255 / 0.18); color: #fff; }
-.room-card.selected .status-dot,
-.room-card.selected .room-state-text,
-.room-card.selected .room-context,
-.room-card.selected .people-count { color: #fff; }
 .room-card-head { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 0.42rem; }
 .room-card-head strong { overflow: hidden; font-size: 0.94rem; text-overflow: ellipsis; white-space: nowrap; }
 .room-floor { padding: 0.12rem 0.34rem; border-radius: 6px; background: var(--dt-surface-alt); color: var(--dt-soft); font-size: 0.62rem; font-weight: 700; white-space: nowrap; }
@@ -1270,16 +1262,11 @@ onUnmounted(() => {
 .calendar-heading,
 .schedule-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.6rem; margin-bottom: 0.24rem; }
 .calendar-heading { align-items: center; margin-bottom: 0.55rem; }
-.calendar-title-group,
-.status-title-group { display: flex; align-items: center; gap: 0.62rem; min-width: 0; }
-.calendar-title-group > div,
-.status-title-group > div { min-width: 0; }
-.calendar-icon,
-.status-icon { display: inline-flex; align-items: center; justify-content: center; width: 2.45rem; height: 2.45rem; flex: 0 0 auto; border-radius: 11px; background: var(--dt-blue-soft); color: var(--dt-blue); }
-.calendar-icon svg,
-.status-icon svg { width: 1.45rem; height: 1.45rem; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.calendar-title-group { display: flex; align-items: center; gap: 0.62rem; min-width: 0; }
+.calendar-title-group > div { min-width: 0; }
+.calendar-icon { display: inline-flex; align-items: center; justify-content: center; width: 2.45rem; height: 2.45rem; flex: 0 0 auto; border-radius: 11px; background: var(--dt-blue-soft); color: var(--dt-blue); }
+.calendar-icon svg { width: 1.45rem; height: 1.45rem; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
 .calendar-heading h2 { font-size: 1.02rem; }
-.status-title-group h2 { font-size: 1.02rem; }
 .calendar-heading h2 span { color: var(--dt-blue); }
 .calendar-controls { display: flex; align-items: center; gap: 0.28rem; }
 .calendar-controls button { display: inline-flex; align-items: center; justify-content: center; width: 2rem; height: 2rem; border: 1px solid var(--dt-border); border-radius: 9px; background: var(--dt-surface); color: var(--dt-text); font: inherit; cursor: pointer; transition: border-color 140ms ease-out, background-color 140ms ease-out; }
@@ -1291,13 +1278,12 @@ onUnmounted(() => {
 .weekday b { font-size: 0.76rem; line-height: 1; }
 .weekday.sunday { background: var(--dt-red-soft); color: var(--dt-red); }
 .weekday.saturday { background: var(--dt-green-soft); color: var(--dt-green); }
-.day-cell { position: relative; display: flex; align-items: center; justify-content: center; min-width: 0; min-height: 0; border: 1px solid var(--dt-border); border-radius: 10px; background: var(--dt-surface); color: var(--dt-text); font: inherit; font-size: 0.86rem; font-weight: 700; font-variant-numeric: tabular-nums; cursor: pointer; transition: border-color 140ms ease-out, background-color 140ms ease-out, box-shadow 140ms ease-out, transform 140ms ease-out; }
+.day-cell { position: relative; display: flex; align-items: center; justify-content: center; min-width: 0; min-height: 0; border: 1px solid var(--dt-border); border-radius: 10px; background: var(--dt-surface); color: var(--dt-text); font: inherit; font-size: 0.86rem; font-weight: 700; font-variant-numeric: tabular-nums; cursor: pointer; transition: border-color 140ms ease-out, background-color 140ms ease-out, transform 140ms ease-out; }
 .day-cell:hover { border-color: color-mix(in srgb, var(--dt-blue) 55%, var(--dt-border)); background: var(--dt-blue-soft); transform: translateY(-1px); }
 .day-cell.muted { color: var(--dt-soft); opacity: 0.5; }
 .day-cell.sunday:not(.selected):not(.muted) { color: var(--dt-red); }
 .day-cell.saturday:not(.selected):not(.muted) { color: var(--dt-green); }
-.day-cell.today { border-width: 2px; border-color: var(--dt-blue); background: var(--dt-blue-soft); color: var(--dt-blue); font-weight: 850; }
-.day-cell.today.selected { background: var(--dt-blue); color: #fff; box-shadow: inset 0 0 0 2px rgb(255 255 255 / 0.78), 0 3px 9px rgb(37 99 235 / 0.24); }
+.day-cell.today:not(.selected) { border-color: color-mix(in srgb, var(--dt-blue) 56%, var(--dt-border)); color: var(--dt-blue); font-weight: 850; }
 .day-cell.selected { border-color: var(--dt-blue); background: var(--dt-blue); color: #fff; box-shadow: 0 3px 9px rgb(37 99 235 / 0.24); }
 :global(:root[data-theme="dark"]) .day-cell.selected { color: #fff; }
 .day-cell i { position: absolute; right: 0.36rem; bottom: 0.28rem; min-width: 0.38rem; width: 0.38rem; height: 0.38rem; border-radius: 50%; background: var(--dt-amber); color: transparent; font-size: 0; font-style: normal; line-height: 0; }
@@ -1322,7 +1308,7 @@ onUnmounted(() => {
 .schedule-room { color: var(--dt-text); font-size: 0.86rem; font-weight: 800; }
 .schedule-subject { display: flex; flex-direction: column; align-items: flex-start; gap: 0.08rem; border-right: 1px solid color-mix(in srgb, var(--dt-border) 70%, transparent); line-height: 1.25; }
 .schedule-course { display: block; max-width: 100%; overflow: hidden; color: var(--dt-text); font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
-.schedule-owner { display: block; max-width: 100%; overflow: hidden; color: var(--dt-soft); font-size: 0.76rem; font-weight: 400; text-overflow: ellipsis; white-space: nowrap; }
+.schedule-owner { display: block; max-width: 100%; overflow: hidden; color: var(--dt-soft); font-size: 0.76rem; font-weight: 550; text-overflow: ellipsis; white-space: nowrap; }
 .schedule-state { justify-self: center; padding: 0.22rem 0.36rem; border-left: 0; border-radius: 999px; font-size: 0.78rem; font-weight: 750; white-space: nowrap; }
 .schedule-state.confirmed { background: var(--dt-green-soft); color: var(--dt-green); }
 .schedule-state.closed { background: var(--dt-red-soft); color: var(--dt-red); }
@@ -1365,7 +1351,7 @@ onUnmounted(() => {
   .live-indicator { font-size: 0.66rem; }
   .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .kpi-card { min-height: 4.25rem; }
-  .status-panel { min-height: 23rem; padding: 0.58rem; }
+  .status-panel { min-height: 23rem; }
   .section-heading { flex-direction: column; }
   .status-legend { justify-content: flex-start; }
   .room-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); max-height: 18rem; }
@@ -1377,8 +1363,7 @@ onUnmounted(() => {
   .room-facts div:nth-child(4) { border-top: 1px solid var(--dt-border); }
   .calendar-panel { min-height: 23rem; padding: 0.58rem; }
   .calendar-heading { align-items: flex-start; }
-  .calendar-icon,
-  .status-icon { display: none; }
+  .calendar-icon { display: none; }
   .calendar-heading h2 { font-size: 0.9rem; }
   .calendar-controls button { width: 1.8rem; height: 1.8rem; }
   .calendar-controls .today-button { padding-inline: 0.48rem; }

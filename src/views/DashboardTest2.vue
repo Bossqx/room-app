@@ -75,10 +75,16 @@ interface ScheduleRecord {
 
 interface RoomStatusView {
   roomcode: string;
-  floorNo: number | null;
   tone: RoomTone;
   label: string;
   context: string;
+}
+
+interface RoomFloorGroup {
+  key: string;
+  label: string;
+  floor: number | null;
+  rooms: RoomStatusView[];
 }
 
 interface CalendarDay {
@@ -110,6 +116,7 @@ const detailError = ref("");
 const selectedRoomCode = ref("");
 const selectedRoomDetail = ref<RoomRecord | null>(null);
 const selectedGalleryIndex = ref(0);
+const roomDetailDialog = ref<HTMLDialogElement | null>(null);
 const lightboxDialog = ref<HTMLDialogElement | null>(null);
 const lightboxImageFailed = ref(false);
 const selectedDate = ref(localDateKey(new Date()));
@@ -327,10 +334,6 @@ const roomStatuses = computed<RoomStatusView[]>(() => {
   summary?.list_usage_rooms.forEach((slot) => codes.add(slot.roomcode));
 
   return [...codes].sort((left, right) => left.localeCompare(right, "th", { numeric: true })).map((roomcode) => {
-    const floorFromCode = roomcode.match(/^\d+\.(\d+)\./)?.[1];
-    const floorNo = floorFromCode
-      ? Number(floorFromCode)
-      : (rooms.value.find((room) => sameRoom(room.room_no, roomcode))?.floor_no ?? null);
     const usageSlots = (summary?.list_usage_rooms ?? [])
       .filter((slot) => sameRoom(slot.roomcode, roomcode))
       .sort((left, right) => left.startTime.localeCompare(right.startTime));
@@ -340,7 +343,6 @@ const roomStatuses = computed<RoomStatusView[]>(() => {
       const pending = !Number.isNaN(Number(activeUsage.usageStatus)) && Number(activeUsage.usageStatus) < 3;
       return {
         roomcode,
-        floorNo,
         tone: pending ? "scheduled" : "busy",
         label: pending ? "มีตาราง—ยังไม่ยืนยัน" : "กำลังใช้งาน",
         context: `ถึง ${activeUsage.finishTime} น.`,
@@ -352,15 +354,41 @@ const roomStatuses = computed<RoomStatusView[]>(() => {
       && nowMinutes.value >= toMinutes(slot.startTime)
       && nowMinutes.value <= toMinutes(slot.finishTime));
     if (activeFree) {
-      return { roomcode, floorNo, tone: "free", label: "ว่าง", context: `ว่างถึง ${activeFree.finishTime} น.` };
+      return { roomcode, tone: "free", label: "ว่าง", context: `ว่างถึง ${activeFree.finishTime} น.` };
     }
 
     const nextUsage = usageSlots.find((slot) => toMinutes(slot.startTime) > nowMinutes.value);
     if (nextUsage) {
-      return { roomcode, floorNo, tone: "scheduled", label: "มีตารางวันนี้", context: `รายการถัดไป ${nextUsage.startTime} น.` };
+      return { roomcode, tone: "scheduled", label: "มีตารางวันนี้", context: `รายการถัดไป ${nextUsage.startTime} น.` };
     }
 
-    return { roomcode, floorNo, tone: "unknown", label: "ไม่มีข้อมูลสถานะ", context: "ไม่มีรายการถัดไปวันนี้" };
+    return { roomcode, tone: "unknown", label: "ไม่มีข้อมูลสถานะ", context: "ไม่มีรายการถัดไปวันนี้" };
+  });
+});
+
+const roomFloorGroups = computed<RoomFloorGroup[]>(() => {
+  const roomByCode = new Map(rooms.value.map((room) => [room.room_no.trim().toLowerCase(), room]));
+  const groups = new Map<string, RoomFloorGroup>();
+
+  roomStatuses.value.forEach((roomStatus) => {
+    const roomRecord = roomByCode.get(roomStatus.roomcode.trim().toLowerCase());
+    const floorFromCode = roomStatus.roomcode.match(/^\d+\.(\d+)\./)?.[1];
+    const floor = floorFromCode ? Number(floorFromCode) : (roomRecord?.floor_no ?? null);
+    const key = floor === null ? "unknown" : String(floor);
+    const group = groups.get(key) ?? {
+      key,
+      label: floor === null ? "ไม่ระบุชั้น" : `ชั้น ${floor.toLocaleString("th-TH")}`,
+      floor,
+      rooms: [],
+    };
+    group.rooms.push(roomStatus);
+    groups.set(key, group);
+  });
+
+  return [...groups.values()].sort((left, right) => {
+    if (left.floor === null) return 1;
+    if (right.floor === null) return -1;
+    return left.floor - right.floor;
   });
 });
 
@@ -372,7 +400,7 @@ const selectedRoom = computed(() =>
 
 const selectedRoomStatus = computed(() =>
   roomStatuses.value.find((room) => sameRoom(room.roomcode, selectedRoomCode.value))
-  ?? { roomcode: selectedRoomCode.value, floorNo: null, tone: "unknown" as const, label: "ไม่มีข้อมูลสถานะ", context: "" },
+  ?? { roomcode: selectedRoomCode.value, tone: "unknown" as const, label: "ไม่มีข้อมูลสถานะ", context: "" },
 );
 
 const roomGalleryImages = computed(() => {
@@ -465,12 +493,8 @@ function personCount(roomcode: string): number | undefined {
 }
 
 function roomAriaLabel(room: RoomStatusView): string {
-  const isSelected = sameRoom(room.roomcode, selectedRoomCode.value);
   const segments = [
-    isSelected
-      ? `ยกเลิกการเลือกห้อง ${room.roomcode} และดูตารางทุกห้อง`
-      : `เลือกห้อง ${room.roomcode}`,
-    room.floorNo === null ? "ไม่ระบุชั้น" : `ชั้น ${room.floorNo}`,
+    `เปิดรายละเอียดห้อง ${room.roomcode}`,
     `สถานะ ${room.label}`,
     room.context,
   ];
@@ -479,8 +503,23 @@ function roomAriaLabel(room: RoomStatusView): string {
   return segments.filter(Boolean).join(", ");
 }
 
-function toggleRoomSelection(roomcode: string) {
-  selectedRoomCode.value = sameRoom(roomcode, selectedRoomCode.value) ? "" : roomcode;
+async function openRoomDetail(roomcode: string) {
+  selectedRoomCode.value = roomcode;
+  await nextTick();
+  if (!roomDetailDialog.value?.open) roomDetailDialog.value?.showModal();
+}
+
+function closeRoomDetail() {
+  roomDetailDialog.value?.close();
+}
+
+function clearRoomSelection() {
+  closeRoomDetail();
+  selectedRoomCode.value = "";
+}
+
+function handleRoomDetailBackdrop(event: MouseEvent) {
+  if (event.target === roomDetailDialog.value) closeRoomDetail();
 }
 
 const roomSchedules = computed(() => selectedRoomCode.value
@@ -692,14 +731,9 @@ onUnmounted(() => {
 
         <section class="status-panel" aria-labelledby="room-status-title">
           <div class="section-heading">
-            <div class="status-title-group">
-              <span class="status-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h1M14 9h1M9 13h1M14 13h1M9 17h1M14 17h1" /></svg>
-              </span>
-              <div>
-                <h2 id="room-status-title">สถานะห้องแบบ Real-time</h2>
-                <p>เลือกห้องเพื่อดูรายละเอียดและกรองตาราง กดห้องเดิมอีกครั้งเพื่อดูทุกห้อง</p>
-              </div>
+            <div>
+              <h2 id="room-status-title">สถานะห้องแบบ Real-time</h2>
+              <p>เลือกห้องเพื่อเปิดรายละเอียดและกรองตาราง รายการห้องจัดกลุ่มตามชั้น</p>
             </div>
             <div class="status-legend" aria-label="คำอธิบายสถานะ">
               <span><i class="tone-free" />ว่าง</span>
@@ -715,44 +749,68 @@ onUnmounted(() => {
             <button type="button" @click="loadCoreData()">ลองอีกครั้ง</button>
           </div>
           <div v-else-if="!roomStatuses.length" class="panel-state">ไม่มีข้อมูลห้องในระบบ</div>
-          <div v-else class="room-grid">
-            <button
-              v-for="room in roomStatuses"
-              :key="room.roomcode"
-              type="button"
-              class="room-card"
-              :class="[`tone-${room.tone}`, { selected: sameRoom(room.roomcode, selectedRoomCode) }]"
-              :aria-pressed="sameRoom(room.roomcode, selectedRoomCode)"
-              :aria-label="roomAriaLabel(room)"
-              @click="toggleRoomSelection(room.roomcode)"
+          <div v-else class="room-floor-list">
+            <section
+              v-for="group in roomFloorGroups"
+              :key="group.key"
+              class="room-floor-group"
+              :aria-labelledby="`floor-${group.key}-title`"
             >
-              <span class="room-card-head">
-                <strong>{{ room.roomcode }}</strong>
-                <span class="room-floor">ชั้น {{ room.floorNo ?? "—" }}</span>
-                <i class="status-dot" aria-hidden="true" />
-              </span>
-              <span class="room-state-text">{{ room.label }}</span>
-              <span class="room-context">{{ room.context }}</span>
-              <span v-if="personCount(room.roomcode) !== undefined" class="people-count">
-                ตรวจพบ {{ personCount(room.roomcode) }} คน
-              </span>
-            </button>
+              <header class="room-floor-heading">
+                <h3 :id="`floor-${group.key}-title`">{{ group.label }}</h3>
+                <span>{{ group.rooms.length }} ห้อง</span>
+              </header>
+              <div class="room-grid">
+                <button
+                  v-for="room in group.rooms"
+                  :key="room.roomcode"
+                  type="button"
+                  class="room-card"
+                  :class="[`tone-${room.tone}`, { selected: sameRoom(room.roomcode, selectedRoomCode) }]"
+                  :aria-pressed="sameRoom(room.roomcode, selectedRoomCode)"
+                  :aria-label="roomAriaLabel(room)"
+                  @click="openRoomDetail(room.roomcode)"
+                >
+                  <span class="room-card-head">
+                    <strong>{{ room.roomcode }}</strong>
+                    <i class="status-dot" aria-hidden="true" />
+                  </span>
+                  <span class="room-state-text">{{ room.label }}</span>
+                  <span class="room-context">{{ room.context }}</span>
+                  <span v-if="personCount(room.roomcode) !== undefined" class="people-count">
+                    ตรวจพบ {{ personCount(room.roomcode) }} คน
+                  </span>
+                </button>
+              </div>
+            </section>
           </div>
         </section>
       </div>
+    </section>
 
-      <aside class="room-detail-panel" aria-labelledby="selected-room-title">
-        <template v-if="selectedRoomCode">
-          <header class="detail-heading">
-            <div>
-              <h2 id="selected-room-title">{{ selectedRoomCode }}</h2>
-              <p>{{ selectedRoom?.room_type || "ไม่มีข้อมูลประเภทห้อง" }}</p>
-            </div>
+    <dialog
+      ref="roomDetailDialog"
+      class="room-detail-dialog"
+      aria-labelledby="selected-room-title"
+      @click="handleRoomDetailBackdrop"
+    >
+      <div v-if="selectedRoomCode" class="room-detail-shell">
+        <header class="detail-heading">
+          <div>
+            <h2 id="selected-room-title">ห้อง {{ selectedRoomCode }}</h2>
+            <p>{{ selectedRoom?.room_type || "ไม่มีข้อมูลประเภทห้อง" }}</p>
+          </div>
+          <div class="detail-heading-actions">
             <span class="status-badge" :class="`tone-${selectedRoomStatus.tone}`">
               <i aria-hidden="true" />{{ selectedRoomStatus.label }}
             </span>
-          </header>
+            <button type="button" class="detail-close" aria-label="ปิดรายละเอียดห้อง" autofocus @click="closeRoomDetail">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
+            </button>
+          </div>
+        </header>
 
+        <div class="room-detail-content">
           <div class="room-gallery" :class="{ 'has-thumbnails': roomGalleryImages.length > 1 }">
             <div class="room-image" :class="{ empty: !roomImageUrl }">
               <button
@@ -794,36 +852,42 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <dl class="room-facts">
-            <div><dt>อาคาร</dt><dd>{{ selectedRoom?.building || "ไม่มีข้อมูล" }}</dd></div>
-            <div><dt>ชั้น</dt><dd>{{ selectedRoom?.floor_no ?? "ไม่มีข้อมูล" }}</dd></div>
-            <div><dt>คอมพิวเตอร์</dt><dd>{{ selectedRoom?.computer_no ?? "ไม่มีข้อมูล" }}</dd></div>
-            <div><dt>ที่นั่ง</dt><dd>{{ selectedRoom?.seat_no ?? "ไม่มีข้อมูล" }}</dd></div>
-          </dl>
+          <div class="room-detail-meta">
+            <dl class="room-facts">
+              <div><dt>อาคาร</dt><dd>{{ selectedRoom?.building || "ไม่มีข้อมูล" }}</dd></div>
+              <div><dt>ชั้น</dt><dd>{{ selectedRoom?.floor_no ?? "ไม่มีข้อมูล" }}</dd></div>
+              <div><dt>คอมพิวเตอร์</dt><dd>{{ selectedRoom?.computer_no ?? "ไม่มีข้อมูล" }}</dd></div>
+              <div><dt>ที่นั่ง</dt><dd>{{ selectedRoom?.seat_no ?? "ไม่มีข้อมูล" }}</dd></div>
+            </dl>
 
-          <div class="feature-section">
-            <div class="feature-heading"><h3>โปรแกรมที่ติดตั้ง</h3><span>{{ activeApplications.length }}</span></div>
-            <p v-if="detailLoading" class="feature-empty" role="status">กำลังโหลด…</p>
-            <div v-else-if="activeApplications.length" class="chip-row">
-              <span v-for="item in activeApplications.slice(0, 5)" :key="featureLabel(item)" class="feature-chip">{{ featureLabel(item) }}</span>
-              <span v-if="activeApplications.length > 5" class="feature-chip more">+{{ activeApplications.length - 5 }}</span>
+            <div class="feature-section">
+              <div class="feature-heading"><h3>โปรแกรมที่ติดตั้ง</h3><span>{{ activeApplications.length }}</span></div>
+              <p v-if="detailLoading" class="feature-empty" role="status">กำลังโหลด…</p>
+              <div v-else-if="activeApplications.length" class="chip-row">
+                <span v-for="item in activeApplications.slice(0, 8)" :key="featureLabel(item)" class="feature-chip">{{ featureLabel(item) }}</span>
+                <span v-if="activeApplications.length > 8" class="feature-chip more">+{{ activeApplications.length - 8 }}</span>
+              </div>
+              <p v-else class="feature-empty">ไม่มีข้อมูลโปรแกรม</p>
             </div>
-            <p v-else class="feature-empty">ไม่มีข้อมูลโปรแกรม</p>
-          </div>
 
-          <div class="feature-section">
-            <div class="feature-heading"><h3>อุปกรณ์</h3><span>{{ activeAccessories.length }}</span></div>
-            <div v-if="activeAccessories.length" class="chip-row">
-              <span v-for="item in activeAccessories.slice(0, 5)" :key="featureLabel(item)" class="feature-chip">{{ featureLabel(item) }}</span>
-              <span v-if="activeAccessories.length > 5" class="feature-chip more">+{{ activeAccessories.length - 5 }}</span>
+            <div class="feature-section">
+              <div class="feature-heading"><h3>อุปกรณ์</h3><span>{{ activeAccessories.length }}</span></div>
+              <div v-if="activeAccessories.length" class="chip-row">
+                <span v-for="item in activeAccessories.slice(0, 8)" :key="featureLabel(item)" class="feature-chip">{{ featureLabel(item) }}</span>
+                <span v-if="activeAccessories.length > 8" class="feature-chip more">+{{ activeAccessories.length - 8 }}</span>
+              </div>
+              <p v-else class="feature-empty">ไม่มีข้อมูลอุปกรณ์</p>
             </div>
-            <p v-else class="feature-empty">ไม่มีข้อมูลอุปกรณ์</p>
+            <p v-if="detailError" class="detail-error" role="alert">{{ detailError }}</p>
           </div>
-          <p v-if="detailError" class="detail-error" role="alert">{{ detailError }}</p>
-        </template>
-        <div v-else class="detail-empty">เลือกห้องเพื่อดูรายละเอียด</div>
-      </aside>
-    </section>
+        </div>
+
+        <footer class="room-detail-actions">
+          <button type="button" class="clear-room-button" @click="clearRoomSelection">แสดงตารางทุกห้อง</button>
+          <button type="button" class="done-button" @click="closeRoomDetail">ปิด</button>
+        </footer>
+      </div>
+    </dialog>
 
     <section class="lower-grid" aria-label="ปฏิทินและตารางการใช้ห้อง">
       <section class="calendar-panel" aria-labelledby="calendar-title">
@@ -1044,14 +1108,13 @@ onUnmounted(() => {
   gap: 0.46rem;
 }
 
-.overview-grid,
+.overview-grid { grid-template-columns: 1fr; }
 .lower-grid { grid-template-columns: minmax(0, 67fr) minmax(19rem, 33fr); }
 .overview-main { display: grid; grid-template-rows: auto auto minmax(0, 1fr); gap: 0.4rem; min-width: 0; min-height: 0; }
 
 .time-strip,
 .kpi-card,
 .status-panel,
-.room-detail-panel,
 .calendar-panel,
 .schedule-panel {
   border: 1px solid color-mix(in srgb, var(--dt-border) 78%, transparent);
@@ -1062,7 +1125,6 @@ onUnmounted(() => {
 
 .kpi-card,
 .status-panel,
-.room-detail-panel,
 .calendar-panel,
 .schedule-panel { box-shadow: var(--dt-panel-shadow); }
 
@@ -1122,23 +1184,24 @@ onUnmounted(() => {
 
 .kpi-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.38rem; min-width: 0; }
 .kpi-card { position: relative; display: grid; grid-template-columns: 2.4rem minmax(0, 1fr); align-items: center; gap: 0.46rem; min-width: 0; min-height: 4.25rem; padding: 0.4rem 0.58rem; overflow: hidden; }
+.kpi-card::after { position: absolute; inset: 0 0 auto; height: 2px; background: var(--kpi-accent); content: ""; }
 .kpi-icon { display: inline-flex; align-items: center; justify-content: center; width: 2.25rem; height: 2.25rem; border-radius: 10px; background: var(--kpi-soft); }
 .kpi-icon svg { width: 1.5rem; height: 1.5rem; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
 .kpi-card p { overflow: hidden; color: var(--dt-soft); font-size: 0.72rem; font-weight: 650; white-space: nowrap; text-overflow: ellipsis; }
 .kpi-card strong { display: block; margin-top: 0.01rem; font-size: 1.55rem; line-height: 1; font-variant-numeric: tabular-nums; }
 .kpi-card strong small { color: var(--dt-muted); font-size: 0.68rem; font-weight: 650; }
 .kpi-card div > span { display: block; margin-top: 0.11rem; overflow: hidden; color: var(--dt-soft); font-size: 0.66rem; white-space: nowrap; text-overflow: ellipsis; }
-.kpi-blue { --kpi-soft: var(--dt-blue-soft); }
-.kpi-green { --kpi-soft: var(--dt-green-soft); }
-.kpi-red { --kpi-soft: var(--dt-red-soft); }
-.kpi-amber { --kpi-soft: var(--dt-amber-soft); }
+.kpi-blue { --kpi-accent: var(--dt-blue); --kpi-soft: var(--dt-blue-soft); }
+.kpi-green { --kpi-accent: var(--dt-green); --kpi-soft: var(--dt-green-soft); }
+.kpi-red { --kpi-accent: var(--dt-red); --kpi-soft: var(--dt-red-soft); }
+.kpi-amber { --kpi-accent: var(--dt-amber); --kpi-soft: var(--dt-amber-soft); }
 .kpi-blue .kpi-icon { color: var(--dt-blue); }
 .kpi-green .kpi-icon { color: var(--dt-green); }
 .kpi-red .kpi-icon { color: var(--dt-red); }
 .kpi-amber .kpi-icon { color: var(--dt-amber); }
 
-.status-panel { display: flex; flex-direction: column; min-width: 0; min-height: 0; padding: 0.65rem 0.72rem 0.72rem; border-radius: 16px; }
-.section-heading { display: flex; align-items: center; justify-content: space-between; gap: 0.7rem; margin-bottom: 0.55rem; }
+.status-panel { display: flex; flex-direction: column; min-width: 0; min-height: 0; padding: 0.48rem; }
+.section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.7rem; margin-bottom: 0.34rem; }
 .section-heading h2,
 .detail-heading h2,
 .calendar-heading h2,
@@ -1156,18 +1219,25 @@ onUnmounted(() => {
 .tone-scheduled { color: var(--dt-amber); }
 .tone-unknown { color: var(--dt-gray); }
 
-.room-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.32rem; min-width: 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
-.room-card { position: relative; display: flex; flex-direction: column; align-items: stretch; min-width: 0; min-height: 4.1rem; padding: 0.42rem 0.52rem; overflow: hidden; border: 1px solid var(--dt-border); border-left-width: 2px; border-radius: 10px; background: var(--dt-surface); color: var(--dt-text); text-align: left; font: inherit; cursor: pointer; transition: border-color 140ms ease-out, background-color 140ms ease-out, box-shadow 140ms ease-out; }
-.room-card:hover { border-color: color-mix(in srgb, var(--dt-blue) 55%, var(--dt-border)); background: var(--dt-blue-soft); }
+.room-floor-list { display: flex; flex: 1; min-height: 0; flex-direction: column; gap: 0.56rem; padding-right: 0.12rem; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+.room-floor-group { min-width: 0; }
+.room-floor-group + .room-floor-group { padding-top: 0.52rem; border-top: 1px solid var(--dt-border); }
+.room-floor-heading { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; margin-bottom: 0.28rem; }
+.room-floor-heading h3 { margin: 0; color: var(--dt-text); font-size: 0.78rem; font-weight: 800; }
+.room-floor-heading span { padding: 0.16rem 0.4rem; border-radius: 999px; background: var(--dt-blue-soft); color: var(--dt-blue); font-size: 0.62rem; font-weight: 750; white-space: nowrap; }
+.room-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr)); gap: 0.32rem; min-width: 0; }
+.room-card { position: relative; display: flex; flex-direction: column; align-items: stretch; min-width: 0; min-height: 4.1rem; padding: 0.38rem 0.52rem 0.38rem 0.7rem; overflow: hidden; border: 1px solid var(--dt-border); border-radius: 10px; background: var(--dt-surface); color: var(--dt-text); text-align: left; font: inherit; cursor: pointer; transition: transform 140ms ease-out, border-color 140ms ease-out, background-color 140ms ease-out; }
+.room-card::before { position: absolute; inset: 0 auto 0 0; width: 3px; background: currentColor; content: ""; }
+.room-card:hover { border-color: color-mix(in srgb, currentColor 55%, var(--dt-border)); background: var(--dt-surface-alt); transform: translateY(-1px); }
 .room-card:focus-visible,
 .calendar-controls button:focus-visible,
 .day-cell:focus-visible,
 .panel-state button:focus-visible { outline: 2px solid var(--dt-blue); outline-offset: 2px; }
-.room-card.tone-free { border-left-color: color-mix(in srgb, var(--dt-green) 48%, var(--dt-border)); }
-.room-card.tone-busy { border-left-color: color-mix(in srgb, var(--dt-red) 48%, var(--dt-border)); }
-.room-card.tone-scheduled { border-left-color: color-mix(in srgb, var(--dt-amber) 48%, var(--dt-border)); }
-.room-card.tone-unknown { border-left-color: color-mix(in srgb, var(--dt-gray) 48%, var(--dt-border)); }
-.room-card.selected { border-color: var(--dt-blue); background: var(--dt-blue); color: #fff; box-shadow: 0 3px 9px rgb(37 99 235 / 0.24); }
+.room-card.selected { border-color: var(--dt-blue); background: color-mix(in srgb, var(--dt-blue-soft) 52%, var(--dt-surface)); box-shadow: inset 0 0 0 1px var(--dt-blue); }
+.room-card.tone-free::before { color: var(--dt-green); }
+.room-card.tone-busy::before { color: var(--dt-red); }
+.room-card.tone-scheduled::before { color: var(--dt-amber); }
+.room-card.tone-unknown::before { color: var(--dt-gray); }
 .room-card.tone-free .status-dot,
 .room-card.tone-free .room-state-text { color: var(--dt-green); }
 .room-card.tone-busy .status-dot,
@@ -1176,14 +1246,8 @@ onUnmounted(() => {
 .room-card.tone-scheduled .room-state-text { color: var(--dt-amber); }
 .room-card.tone-unknown .status-dot,
 .room-card.tone-unknown .room-state-text { color: var(--dt-gray); }
-.room-card.selected .room-floor { background: rgb(255 255 255 / 0.18); color: #fff; }
-.room-card.selected .status-dot,
-.room-card.selected .room-state-text,
-.room-card.selected .room-context,
-.room-card.selected .people-count { color: #fff; }
-.room-card-head { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 0.42rem; }
+.room-card-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
 .room-card-head strong { overflow: hidden; font-size: 0.94rem; text-overflow: ellipsis; white-space: nowrap; }
-.room-floor { padding: 0.12rem 0.34rem; border-radius: 6px; background: var(--dt-surface-alt); color: var(--dt-soft); font-size: 0.62rem; font-weight: 700; white-space: nowrap; }
 .status-dot { width: 0.52rem; height: 0.52rem; flex: 0 0 auto; border-radius: 50%; background: currentColor; }
 .room-state-text { margin-top: 0.09rem; overflow: hidden; font-size: 0.72rem; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
 .room-context,
@@ -1196,9 +1260,19 @@ onUnmounted(() => {
 .panel-state.error { flex-direction: column; gap: 0.5rem; color: var(--dt-red); }
 .panel-state button { border: 1px solid var(--dt-border); border-radius: 6px; padding: 0.35rem 0.6rem; background: var(--dt-surface); color: var(--dt-text); font: inherit; cursor: pointer; }
 
-.room-detail-panel { min-width: 0; min-height: 0; padding: 0.62rem; overflow-y: auto; background: color-mix(in srgb, var(--dt-blue-soft) 20%, var(--dt-surface)); scrollbar-width: thin; }
-.detail-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.6rem; margin-bottom: 0.38rem; }
-.detail-heading h2 { font-size: 1.14rem; }
+.room-detail-dialog { width: min(92vw, 58rem); max-width: none; max-height: 88dvh; padding: 0; overflow: hidden; border: 0; border-radius: 16px; background: var(--dt-surface); color: var(--dt-text); box-shadow: 0 24px 70px rgb(15 23 42 / 0.28); }
+.room-detail-dialog::backdrop { background: rgb(15 23 42 / 0.56); backdrop-filter: blur(4px); }
+.room-detail-shell { max-height: 88dvh; padding: 0.78rem; overflow-y: auto; box-sizing: border-box; scrollbar-width: thin; }
+.detail-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.8rem; margin-bottom: 0.7rem; padding-bottom: 0.62rem; border-bottom: 1px solid var(--dt-border); }
+.detail-heading h2 { font-size: 1.22rem; }
+.detail-heading-actions { display: flex; align-items: center; justify-content: flex-end; gap: 0.5rem; }
+.detail-close { display: inline-flex; align-items: center; justify-content: center; width: 2.1rem; height: 2.1rem; flex: 0 0 auto; padding: 0; border: 1px solid var(--dt-border); border-radius: 8px; background: var(--dt-surface-alt); color: var(--dt-text); cursor: pointer; }
+.detail-close:hover { border-color: color-mix(in srgb, var(--dt-blue) 45%, var(--dt-border)); background: var(--dt-blue-soft); color: var(--dt-blue); }
+.detail-close:focus-visible,
+.room-detail-actions button:focus-visible { outline: 2px solid var(--dt-blue); outline-offset: 2px; }
+.detail-close svg { width: 1.15rem; height: 1.15rem; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.room-detail-content { display: grid; grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr); align-items: start; gap: 0.8rem; }
+.room-detail-meta { min-width: 0; }
 .status-badge { display: inline-flex; align-items: center; gap: 0.32rem; max-width: 55%; padding: 0.28rem 0.52rem; border-radius: 999px; background: var(--dt-surface-alt); font-size: 0.64rem; font-weight: 750; }
 .status-badge.tone-free { background: var(--dt-green-soft); }
 .status-badge.tone-busy { background: var(--dt-red-soft); }
@@ -1212,6 +1286,8 @@ onUnmounted(() => {
 .image-zoom-hint { position: absolute; right: 0.48rem; bottom: 0.42rem; display: inline-flex; align-items: center; gap: 0.28rem; padding: 0.26rem 0.42rem; border-radius: 6px; background: rgb(15 23 42 / 0.78); color: #fff; font-size: 0.64rem; font-weight: 700; backdrop-filter: blur(5px); }
 .image-zoom-hint svg { width: 0.86rem; height: 0.86rem; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
 .room-gallery.has-thumbnails .room-image { height: 8rem; min-height: 8rem; max-height: 8rem; }
+.room-detail-dialog .room-image { height: 14rem; min-height: 14rem; max-height: 14rem; }
+.room-detail-dialog .room-gallery.has-thumbnails .room-image { height: 12.5rem; min-height: 12.5rem; max-height: 12.5rem; }
 .room-thumbnails { display: flex; gap: 0.36rem; padding: 0.1rem 0.12rem 0.18rem; overflow-x: auto; scrollbar-width: thin; }
 .room-thumbnail { width: 4.2rem; height: 3rem; flex: 0 0 auto; padding: 0; overflow: hidden; border: 2px solid transparent; border-radius: 8px; background: var(--dt-surface-alt); cursor: pointer; transition: border-color 140ms ease-out, transform 140ms ease-out; }
 .room-thumbnail:hover { border-color: color-mix(in srgb, var(--dt-blue) 45%, var(--dt-border)); transform: translateY(-1px); }
@@ -1260,9 +1336,16 @@ onUnmounted(() => {
 .chip-row { display: flex; gap: 0.24rem; margin-top: 0.22rem; overflow: hidden; }
 .feature-chip { display: inline-block; max-width: 7.5rem; padding: 0.22rem 0.38rem; overflow: hidden; border: 1px solid var(--dt-border); border-radius: 5px; background: var(--dt-surface-alt); color: var(--dt-muted); font-size: 0.68rem; text-overflow: ellipsis; white-space: nowrap; }
 .feature-chip.more { flex: 0 0 auto; color: var(--dt-blue); font-weight: 750; }
+.room-detail-dialog .chip-row { flex-wrap: wrap; overflow: visible; }
 .feature-empty,
 .detail-error { margin: 0.28rem 0 0; color: var(--dt-soft); font-size: 0.68rem; }
 .detail-error { color: var(--dt-red); }
+.room-detail-actions { display: flex; align-items: center; justify-content: flex-end; gap: 0.42rem; margin-top: 0.72rem; padding-top: 0.62rem; border-top: 1px solid var(--dt-border); }
+.room-detail-actions button { min-height: 2.15rem; padding: 0.38rem 0.72rem; border: 1px solid var(--dt-border); border-radius: 8px; font: inherit; font-size: 0.72rem; font-weight: 750; cursor: pointer; }
+.clear-room-button { background: var(--dt-surface); color: var(--dt-blue); }
+.clear-room-button:hover { border-color: var(--dt-blue); background: var(--dt-blue-soft); }
+.done-button { border-color: var(--dt-blue) !important; background: var(--dt-blue); color: #fff; }
+.done-button:hover { background: color-mix(in srgb, var(--dt-blue) 86%, #000); }
 
 .calendar-panel,
 .schedule-panel { min-width: 0; min-height: 0; padding: 0.5rem 0.58rem; overflow: hidden; }
@@ -1270,16 +1353,11 @@ onUnmounted(() => {
 .calendar-heading,
 .schedule-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.6rem; margin-bottom: 0.24rem; }
 .calendar-heading { align-items: center; margin-bottom: 0.55rem; }
-.calendar-title-group,
-.status-title-group { display: flex; align-items: center; gap: 0.62rem; min-width: 0; }
-.calendar-title-group > div,
-.status-title-group > div { min-width: 0; }
-.calendar-icon,
-.status-icon { display: inline-flex; align-items: center; justify-content: center; width: 2.45rem; height: 2.45rem; flex: 0 0 auto; border-radius: 11px; background: var(--dt-blue-soft); color: var(--dt-blue); }
-.calendar-icon svg,
-.status-icon svg { width: 1.45rem; height: 1.45rem; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.calendar-title-group { display: flex; align-items: center; gap: 0.62rem; min-width: 0; }
+.calendar-title-group > div { min-width: 0; }
+.calendar-icon { display: inline-flex; align-items: center; justify-content: center; width: 2.45rem; height: 2.45rem; flex: 0 0 auto; border-radius: 11px; background: var(--dt-blue-soft); color: var(--dt-blue); }
+.calendar-icon svg { width: 1.45rem; height: 1.45rem; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
 .calendar-heading h2 { font-size: 1.02rem; }
-.status-title-group h2 { font-size: 1.02rem; }
 .calendar-heading h2 span { color: var(--dt-blue); }
 .calendar-controls { display: flex; align-items: center; gap: 0.28rem; }
 .calendar-controls button { display: inline-flex; align-items: center; justify-content: center; width: 2rem; height: 2rem; border: 1px solid var(--dt-border); border-radius: 9px; background: var(--dt-surface); color: var(--dt-text); font: inherit; cursor: pointer; transition: border-color 140ms ease-out, background-color 140ms ease-out; }
@@ -1291,13 +1369,12 @@ onUnmounted(() => {
 .weekday b { font-size: 0.76rem; line-height: 1; }
 .weekday.sunday { background: var(--dt-red-soft); color: var(--dt-red); }
 .weekday.saturday { background: var(--dt-green-soft); color: var(--dt-green); }
-.day-cell { position: relative; display: flex; align-items: center; justify-content: center; min-width: 0; min-height: 0; border: 1px solid var(--dt-border); border-radius: 10px; background: var(--dt-surface); color: var(--dt-text); font: inherit; font-size: 0.86rem; font-weight: 700; font-variant-numeric: tabular-nums; cursor: pointer; transition: border-color 140ms ease-out, background-color 140ms ease-out, box-shadow 140ms ease-out, transform 140ms ease-out; }
+.day-cell { position: relative; display: flex; align-items: center; justify-content: center; min-width: 0; min-height: 0; border: 1px solid var(--dt-border); border-radius: 10px; background: var(--dt-surface); color: var(--dt-text); font: inherit; font-size: 0.86rem; font-weight: 700; font-variant-numeric: tabular-nums; cursor: pointer; transition: border-color 140ms ease-out, background-color 140ms ease-out, transform 140ms ease-out; }
 .day-cell:hover { border-color: color-mix(in srgb, var(--dt-blue) 55%, var(--dt-border)); background: var(--dt-blue-soft); transform: translateY(-1px); }
 .day-cell.muted { color: var(--dt-soft); opacity: 0.5; }
 .day-cell.sunday:not(.selected):not(.muted) { color: var(--dt-red); }
 .day-cell.saturday:not(.selected):not(.muted) { color: var(--dt-green); }
-.day-cell.today { border-width: 2px; border-color: var(--dt-blue); background: var(--dt-blue-soft); color: var(--dt-blue); font-weight: 850; }
-.day-cell.today.selected { background: var(--dt-blue); color: #fff; box-shadow: inset 0 0 0 2px rgb(255 255 255 / 0.78), 0 3px 9px rgb(37 99 235 / 0.24); }
+.day-cell.today:not(.selected) { border-color: color-mix(in srgb, var(--dt-blue) 56%, var(--dt-border)); color: var(--dt-blue); font-weight: 850; }
 .day-cell.selected { border-color: var(--dt-blue); background: var(--dt-blue); color: #fff; box-shadow: 0 3px 9px rgb(37 99 235 / 0.24); }
 :global(:root[data-theme="dark"]) .day-cell.selected { color: #fff; }
 .day-cell i { position: absolute; right: 0.36rem; bottom: 0.28rem; min-width: 0.38rem; width: 0.38rem; height: 0.38rem; border-radius: 50%; background: var(--dt-amber); color: transparent; font-size: 0; font-style: normal; line-height: 0; }
@@ -1322,7 +1399,7 @@ onUnmounted(() => {
 .schedule-room { color: var(--dt-text); font-size: 0.86rem; font-weight: 800; }
 .schedule-subject { display: flex; flex-direction: column; align-items: flex-start; gap: 0.08rem; border-right: 1px solid color-mix(in srgb, var(--dt-border) 70%, transparent); line-height: 1.25; }
 .schedule-course { display: block; max-width: 100%; overflow: hidden; color: var(--dt-text); font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
-.schedule-owner { display: block; max-width: 100%; overflow: hidden; color: var(--dt-soft); font-size: 0.76rem; font-weight: 400; text-overflow: ellipsis; white-space: nowrap; }
+.schedule-owner { display: block; max-width: 100%; overflow: hidden; color: var(--dt-soft); font-size: 0.76rem; font-weight: 550; text-overflow: ellipsis; white-space: nowrap; }
 .schedule-state { justify-self: center; padding: 0.22rem 0.36rem; border-left: 0; border-radius: 999px; font-size: 0.78rem; font-weight: 750; white-space: nowrap; }
 .schedule-state.confirmed { background: var(--dt-green-soft); color: var(--dt-green); }
 .schedule-state.closed { background: var(--dt-red-soft); color: var(--dt-red); }
@@ -1340,18 +1417,14 @@ onUnmounted(() => {
 
 @media (max-width: 1199px) {
   .dashboard-test-page { height: auto; min-height: calc(100dvh - 3.1rem); overflow: visible; grid-template-rows: auto auto; }
-  .overview-grid,
   .lower-grid { grid-template-columns: minmax(0, 62fr) minmax(18rem, 38fr); }
   .overview-main { min-height: 31rem; }
-  .room-detail-panel { max-height: 31rem; }
   .lower-grid { min-height: 18rem; }
 }
 
 @media (max-width: 900px) {
-  .overview-grid,
   .lower-grid { grid-template-columns: 1fr; }
   .overview-main { min-height: 34rem; }
-  .room-detail-panel { max-height: none; }
   .calendar-panel { min-height: 23rem; }
   .schedule-panel { min-height: 12rem; }
 }
@@ -1365,20 +1438,21 @@ onUnmounted(() => {
   .live-indicator { font-size: 0.66rem; }
   .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .kpi-card { min-height: 4.25rem; }
-  .status-panel { min-height: 23rem; padding: 0.58rem; }
+  .status-panel { min-height: 23rem; }
   .section-heading { flex-direction: column; }
   .status-legend { justify-content: flex-start; }
   .room-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); max-height: 18rem; }
-  .room-detail-panel { overflow: visible; }
-  .room-image,
-  .room-image img { max-height: 12rem; }
+  .room-detail-dialog { width: calc(100vw - 1rem); max-height: calc(100dvh - 1rem); }
+  .room-detail-shell { max-height: calc(100dvh - 1rem); padding: 0.64rem; }
+  .room-detail-content { grid-template-columns: 1fr; }
+  .room-detail-dialog .room-image,
+  .room-detail-dialog .room-gallery.has-thumbnails .room-image { height: 12rem; min-height: 12rem; max-height: 12rem; }
   .room-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .room-facts div:nth-child(3) { border-left: 0; border-top: 1px solid var(--dt-border); }
   .room-facts div:nth-child(4) { border-top: 1px solid var(--dt-border); }
   .calendar-panel { min-height: 23rem; padding: 0.58rem; }
   .calendar-heading { align-items: flex-start; }
-  .calendar-icon,
-  .status-icon { display: none; }
+  .calendar-icon { display: none; }
   .calendar-heading h2 { font-size: 0.9rem; }
   .calendar-controls button { width: 1.8rem; height: 1.8rem; }
   .calendar-controls .today-button { padding-inline: 0.48rem; }
@@ -1404,6 +1478,11 @@ onUnmounted(() => {
   .kpi-card strong { font-size: 1.28rem; }
   .room-grid { grid-template-columns: 1fr; }
   .status-panel { min-height: 25rem; }
+  .detail-heading { align-items: stretch; }
+  .detail-heading-actions { flex-direction: column-reverse; align-items: flex-end; }
+  .status-badge { max-width: 100%; }
+  .room-detail-actions { align-items: stretch; flex-direction: column-reverse; }
+  .room-detail-actions button { width: 100%; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -30,6 +30,8 @@ const RoomAdmin = () => import("../views/RoomAdmin.vue");
 const AdminCancelRoom = () => import("../views/AdminCancelRoom.vue");
 const DashboardTestLayout = () => import("../layouts/DashboardTestLayout.vue");
 const DashboardTest = () => import("../views/DashboardTest.vue");
+const DashboardTest2 = () => import("../views/DashboardTest2.vue");
+const DashboardTest3 = () => import("../views/DashboardTest3.vue");
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -65,6 +67,20 @@ const router = createRouter({
       component: DashboardTestLayout,
       children: [
         { path: "", name: "dashboard-test", component: DashboardTest },
+      ],
+    },
+    {
+      path: "/dashboard-test2",
+      component: DashboardTestLayout,
+      children: [
+        { path: "", name: "dashboard-test2", component: DashboardTest2 },
+      ],
+    },
+    {
+      path: "/dashboard-test3",
+      component: DashboardTestLayout,
+      children: [
+        { path: "", name: "dashboard-test3", component: DashboardTest3 },
       ],
     },
 
