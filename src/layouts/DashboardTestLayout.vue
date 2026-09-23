@@ -1,14 +1,34 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, provide, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import ThemeToggle from "../views/components/ThemeToggle.vue";
+import BookingDesktop from "../views/components/BookingDesktop.vue";
 import { useUserStore } from "../stores/user";
 
 const router = useRouter();
 const route = useRoute();
 const userStore = useUserStore();
 const drawerOpen = ref(false);
+const showBookingModal = ref(false);
+const bookingStartTime = ref("");
+const bookingFinishTime = ref("");
+const bookingRoomCode = ref("");
+const bookingDate = ref("");
 const logo = "/icons/icon-192.svg";
+
+function showBooking(startTime?: string, finishTime?: string, roomCode?: string, bookingDateStr?: string) {
+  if (!userStore.isLoggedIn) {
+    router.push("/login");
+    return;
+  }
+  bookingStartTime.value = startTime ?? "";
+  bookingFinishTime.value = finishTime ?? "";
+  bookingRoomCode.value = roomCode ?? "";
+  bookingDate.value = bookingDateStr ?? "";
+  showBookingModal.value = true;
+}
+
+provide("showBooking", showBooking);
 
 const menuItems = [
   {
@@ -123,6 +143,25 @@ function handleAuthAction() {
     <main class="test-content">
       <RouterView />
     </main>
+
+    <Teleport to="body">
+      <div v-if="showBookingModal" class="booking-overlay" @click.self="showBookingModal = false">
+        <section class="booking-modal" role="dialog" aria-modal="true" aria-label="จองห้อง">
+          <button type="button" class="booking-close" aria-label="ปิดหน้าต่างจองห้อง" @click="showBookingModal = false">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M6 18 18 6M6 6l12 12" />
+            </svg>
+          </button>
+          <BookingDesktop
+            :start-time="bookingStartTime"
+            :finish-time="bookingFinishTime"
+            :room-code="bookingRoomCode"
+            :booking-date="bookingDate"
+            @booked="showBookingModal = false"
+          />
+        </section>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -273,6 +312,67 @@ function handleAuthAction() {
   min-width: 0;
 }
 
+.booking-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  background: rgb(15 23 42 / 0.65);
+  backdrop-filter: blur(3px);
+}
+
+.booking-modal {
+  position: relative;
+  width: 100%;
+  max-width: 520px;
+  max-height: 90vh;
+  overflow-y: auto;
+  border-radius: 1rem;
+  box-shadow: 0 25px 60px rgb(0 0 0 / 0.5);
+}
+
+.booking-modal :deep(.page) {
+  position: static !important;
+  inset: auto !important;
+  width: auto !important;
+  height: auto !important;
+  min-height: 0 !important;
+}
+
+.booking-close {
+  position: absolute;
+  top: 0.8rem;
+  right: 0.8rem;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #6b7280;
+  color: #fff;
+  cursor: pointer;
+}
+
+.booking-close svg {
+  width: 1rem;
+  height: 1rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.booking-close:hover { background: #4b5563; }
+.booking-close:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+
 @media (max-width: 1040px) {
   .brand-title {
     max-width: 13rem;
@@ -375,6 +475,8 @@ function handleAuthAction() {
   .brand-title {
     max-width: 9.5rem;
   }
+
+  .booking-overlay { padding: 0.7rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {
