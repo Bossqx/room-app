@@ -155,7 +155,7 @@ defineExpose({ showBooking })
     </header>
 
     <!-- Container -->
-    <main class="container">
+    <main class="container" :class="{ 'container--flush': route.path === '/desktop/overview' }">
       <RouterView />
     </main>
 
@@ -311,6 +311,10 @@ defineExpose({ showBooking })
   min-width: 0;
   padding: 2.5rem 2rem 1.5rem;
   overflow-y: auto;
+}
+
+.container--flush {
+  padding: 0;
 }
 
 /* ── MQTT badge ── */

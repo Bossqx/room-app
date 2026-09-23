@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, provide } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '../stores/user'
 import config from "../assets/config.json"
 import ThemeToggle from '../views/components/ThemeToggle.vue'
+import BookingDesktop from '../views/components/BookingDesktop.vue'
 
 const logo = '/icons/icon-192.svg'
 
@@ -14,6 +15,25 @@ const apiBase   = (config.apiRoute ?? 'http://localhost:8000').replace(/\/$/, ''
 
 const mqttHost   = ref('–')
 const mqttStatus = ref<'connecting' | 'connected' | 'disconnected'>('connecting')
+const showBookingModal = ref(false)
+const bookingStartTime = ref('')
+const bookingFinishTime = ref('')
+const bookingRoomCode = ref('')
+const bookingDate = ref('')
+
+function showBooking(startTime?: string, finishTime?: string, roomCode?: string, bookingDateStr?: string) {
+  if (!userStore.isLoggedIn) {
+    router.push('/login')
+    return
+  }
+  bookingStartTime.value = startTime ?? ''
+  bookingFinishTime.value = finishTime ?? ''
+  bookingRoomCode.value = roomCode ?? ''
+  bookingDate.value = bookingDateStr ?? ''
+  showBookingModal.value = true
+}
+
+provide('showBooking', showBooking)
 
 let pollTimer: ReturnType<typeof setInterval> | null = null
 
@@ -124,6 +144,25 @@ function logout() {
         <span>Logout</span>
       </button>
     </nav>
+
+    <Teleport to="body">
+      <div v-if="showBookingModal" class="booking-overlay" @click.self="showBookingModal = false">
+        <section class="booking-modal" role="dialog" aria-modal="true" aria-label="จองห้อง">
+          <button type="button" class="booking-close" aria-label="ปิดหน้าต่างจองห้อง" @click="showBookingModal = false">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M6 18 18 6M6 6l12 12" />
+            </svg>
+          </button>
+          <BookingDesktop
+            :start-time="bookingStartTime"
+            :finish-time="bookingFinishTime"
+            :room-code="bookingRoomCode"
+            :booking-date="bookingDate"
+            @booked="showBookingModal = false"
+          />
+        </section>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -213,6 +252,67 @@ function logout() {
   padding-top: 44px;
   padding-bottom: 72px;
 }
+
+.booking-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.7rem;
+  background: rgb(15 23 42 / 0.65);
+  backdrop-filter: blur(3px);
+}
+
+.booking-modal {
+  position: relative;
+  width: 100%;
+  max-width: 520px;
+  max-height: 90vh;
+  overflow-y: auto;
+  border-radius: 1rem;
+  box-shadow: 0 25px 60px rgb(0 0 0 / 0.5);
+}
+
+.booking-modal :deep(.page) {
+  position: static !important;
+  inset: auto !important;
+  width: auto !important;
+  height: auto !important;
+  min-height: 0 !important;
+}
+
+.booking-close {
+  position: absolute;
+  top: 0.8rem;
+  right: 0.8rem;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #6b7280;
+  color: #fff;
+  cursor: pointer;
+}
+
+.booking-close svg {
+  width: 1rem;
+  height: 1rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.booking-close:hover { background: #4b5563; }
+.booking-close:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 
 /* ── Bottom navigation ── */
 .bottom-nav {

@@ -148,7 +148,7 @@ const router = createRouter({
         {
           path: "/desktop/overview",
           name: "/desktop/overview",
-          component: InformationDashboard,
+          component: DashboardTest4,
         },
       ],
     },

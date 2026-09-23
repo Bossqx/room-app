@@ -123,6 +123,7 @@ const detailError = ref("");
 const selectedRoomCode = ref("");
 const selectedRoomDetail = ref<RoomRecord | null>(null);
 const selectedGalleryIndex = ref(0);
+const roomDetailDialog = ref<HTMLDialogElement | null>(null);
 const lightboxDialog = ref<HTMLDialogElement | null>(null);
 const datePickerInput = ref<HTMLInputElement | null>(null);
 const lightboxImageFailed = ref(false);
@@ -481,6 +482,9 @@ const selectedGalleryImage = computed(() =>
   roomGalleryImages.value[selectedGalleryIndex.value] ?? roomGalleryImages.value[0] ?? null,
 );
 
+const visibleGalleryThumbnails = computed(() => roomGalleryImages.value.slice(0, 4));
+const remainingGalleryCount = computed(() => Math.max(0, roomGalleryImages.value.length - 4));
+
 const roomImageUrl = computed(() =>
   imageFailed.value ? "" : selectedGalleryImage.value?.src ?? "",
 );
@@ -549,11 +553,8 @@ function personCount(roomcode: string): number | undefined {
 }
 
 function roomAriaLabel(room: RoomStatusView): string {
-  const isSelected = sameRoom(room.roomcode, selectedRoomCode.value);
   const segments = [
-    isSelected
-      ? `ยกเลิกการเลือกห้อง ${room.roomcode} และดูตารางทุกห้อง`
-      : `เลือกห้อง ${room.roomcode}`,
+    `ดูรายละเอียดห้อง ${room.roomcode}`,
     room.floorNo === null ? "ไม่ระบุชั้น" : `ชั้น ${room.floorNo}`,
     `สถานะ ${room.label}`,
     room.context,
@@ -565,8 +566,20 @@ function roomAriaLabel(room: RoomStatusView): string {
   return segments.filter(Boolean).join(", ");
 }
 
-function toggleRoomSelection(roomcode: string) {
-  selectedRoomCode.value = sameRoom(roomcode, selectedRoomCode.value) ? "" : roomcode;
+async function openRoomDetail(roomcode: string) {
+  selectedRoomCode.value = roomcode;
+  await nextTick();
+  if (roomDetailDialog.value && !roomDetailDialog.value.open) {
+    roomDetailDialog.value.showModal();
+  }
+}
+
+function closeRoomDetail() {
+  roomDetailDialog.value?.close();
+}
+
+function handleRoomDetailClosed() {
+  selectedRoomCode.value = "";
 }
 
 function bookRoom(room: RoomStatusView) {
@@ -741,6 +754,15 @@ function scheduleTone(item: ScheduleRecord): string {
   return "scheduled";
 }
 
+function isSchedulePast(item: ScheduleRecord): boolean {
+  const scheduleDay = item.schedule_date?.slice(0, 10);
+  const today = localDateKey(now.value);
+  if (!scheduleDay || !item.finishTime) return false;
+  if (scheduleDay < today) return true;
+  if (scheduleDay > today) return false;
+  return toMinutes(item.finishTime) <= nowMinutes.value;
+}
+
 watch(selectedRoomCode, (roomCode) => {
   closeLightbox();
   selectedGalleryIndex.value = 0;
@@ -769,6 +791,19 @@ onUnmounted(() => {
     <h1 class="sr-only">แดชบอร์ดสถานะและการใช้ห้องคอมพิวเตอร์</h1>
 
     <section class="overview-grid" aria-label="ภาพรวมสถานะห้อง">
+      <div class="mobile-current-time">
+        <span class="time-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="8.5" />
+            <path d="M12 7.5V12l3 2" />
+          </svg>
+        </span>
+        <div>
+          <p class="date-label">{{ dateLabel }}</p>
+          <time class="time-label" :datetime="now.toISOString()" aria-label="เวลาปัจจุบัน">{{ timeLabel }}</time>
+        </div>
+      </div>
+
       <div class="overview-main">
         <section class="kpi-grid" aria-label="สรุปข้อมูลวันนี้">
           <article class="kpi-card kpi-blue">
@@ -965,18 +1000,28 @@ onUnmounted(() => {
                   class="room-card"
                   :class="[`tone-${room.tone}`, { selected: sameRoom(room.roomcode, selectedRoomCode) }]"
                 >
-                  <button
-                    type="button"
-                    class="room-card-main"
-                    :aria-pressed="sameRoom(room.roomcode, selectedRoomCode)"
-                    :aria-label="roomAriaLabel(room)"
-                    @click="toggleRoomSelection(room.roomcode)"
-                  >
+                  <div class="room-card-main">
                     <span class="room-card-head">
                       <span class="room-title">
                         <strong>{{ room.roomcode }}</strong>
+                        <i class="status-dot" aria-hidden="true" />
                       </span>
-                      <i class="status-dot" aria-hidden="true" />
+                      <span class="room-card-head-actions">
+                        <button
+                          type="button"
+                          class="room-detail-button"
+                          :aria-label="roomAriaLabel(room)"
+                          title="ดูรายละเอียดห้อง"
+                          @click="openRoomDetail(room.roomcode)"
+                        >
+                          <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <circle cx="12" cy="12" r="9" />
+                            <path d="M12 10.5V16" />
+                            <path d="M12 7.5h.01" />
+                          </svg>
+                          <span class="sr-only">ดูรายละเอียดห้อง</span>
+                        </button>
+                      </span>
                     </span>
                     <span class="room-status-line">
                       <span class="room-state-text">{{ room.label }}</span>
@@ -991,16 +1036,17 @@ onUnmounted(() => {
                     <span v-if="personCount(room.roomcode) !== undefined" class="people-count">
                       ตรวจพบ {{ personCount(room.roomcode) }} คน
                     </span>
-                  </button>
-                  <button
-                    v-if="room.tone === 'free'"
-                    type="button"
-                    class="room-book-button"
-                    :aria-label="`จองห้อง ${room.roomcode}`"
-                    @click="bookRoom(room)"
-                  >
-                    จองห้อง
-                  </button>
+                  </div>
+                  <div v-if="room.tone === 'free'" class="room-card-actions">
+                    <button
+                      type="button"
+                      class="room-book-button"
+                      :aria-label="`จองห้อง ${room.roomcode}`"
+                      @click="bookRoom(room)"
+                    >
+                      จองห้อง
+                    </button>
+                  </div>
                 </article>
               </div>
             </section>
@@ -1013,14 +1059,57 @@ onUnmounted(() => {
     <section class="lower-grid" aria-label="ตารางการใช้ห้อง">
       <section
         class="schedule-panel"
-        :class="{ 'has-room-detail': activeOverviewView === 'rooms' && selectedRoomCode }"
         aria-labelledby="schedule-title"
       >
-        <aside
-          v-if="activeOverviewView === 'rooms' && selectedRoomCode"
-          class="room-detail-panel schedule-room-detail"
-          aria-labelledby="selected-room-title"
-        >
+
+        <header class="schedule-heading">
+          <div class="schedule-title-group">
+            <span class="schedule-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M7 3v3M17 3v3M4 8h16M5 5h14a1 1 0 0 1 1 1v14H4V6a1 1 0 0 1 1-1Z" /><path d="M8 12h3M13 12h3M8 16h3M13 16h3" /></svg>
+            </span>
+            <div><h2 id="schedule-title">ตารางการใช้ห้อง</h2><p>{{ scheduleDateLabel }}</p></div>
+          </div>
+          <span>{{ selectedDaySchedules.length }} รายการ</span>
+        </header>
+        <div v-if="!selectedDaySchedules.length" class="schedule-empty">
+          {{ activeOverviewView === "rooms" ? "ไม่มีรายการในวันปัจจุบัน" : "ไม่มีรายการในวันที่เลือก" }}
+        </div>
+        <div v-else class="schedule-table" role="table" :aria-label="`ตารางการใช้ห้อง ${scheduleDateLabel}`">
+          <div class="schedule-table-head" role="row">
+            <span role="columnheader">เวลา</span>
+            <span role="columnheader">ห้อง</span>
+            <span role="columnheader">รายวิชา / ผู้สอน</span>
+            <span role="columnheader">สถานะ</span>
+          </div>
+          <div class="schedule-table-body" role="rowgroup">
+            <div
+              v-for="item in selectedDaySchedules"
+              :key="`${item.schedule_id ?? item.id ?? item.rowId}-${item.roomcode}-${item.startTime}`"
+              class="schedule-table-row"
+              :class="{ past: isSchedulePast(item) }"
+              :aria-label="isSchedulePast(item) ? 'รายการที่ผ่านมาแล้ว' : undefined"
+              role="row"
+            >
+              <time role="cell">{{ item.startTime }}–{{ item.finishTime }}</time>
+              <strong class="schedule-room" role="cell">{{ item.roomcode || selectedRoomCode }}</strong>
+              <div class="schedule-subject" role="cell">
+                <span class="schedule-course">{{ scheduleTitle(item) }}</span>
+                <span class="schedule-owner">ผู้สอน: {{ scheduleOwner(item) || "—" }}</span>
+              </div>
+              <span class="schedule-state" :class="scheduleTone(item)" role="cell">{{ scheduleStatus(item) }}</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </section>
+    <dialog
+      ref="roomDetailDialog"
+      class="room-detail-dialog"
+      aria-labelledby="selected-room-title"
+      @click.self="closeRoomDetail"
+      @close="handleRoomDetailClosed"
+    >
+      <section class="room-detail-panel modal-room-detail">
           <header class="detail-heading">
             <div>
               <h2 id="selected-room-title">ห้อง {{ selectedRoomCode }}</h2>
@@ -1030,7 +1119,7 @@ onUnmounted(() => {
               <span class="status-badge" :class="`tone-${selectedRoomStatus.tone}`">
                 <i aria-hidden="true" />{{ selectedRoomStatus.label }}
               </span>
-              <button type="button" class="detail-close" aria-label="ปิดรายละเอียดห้อง" @click="selectedRoomCode = ''">
+              <button type="button" class="detail-close" aria-label="ปิดรายละเอียดห้อง" autofocus @click="closeRoomDetail">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
               </button>
             </div>
@@ -1063,7 +1152,7 @@ onUnmounted(() => {
 
             <div v-if="roomGalleryImages.length > 1" class="room-thumbnails" aria-label="รูปภาพห้องทั้งหมด">
               <button
-                v-for="(image, index) in roomGalleryImages"
+                v-for="(image, index) in visibleGalleryThumbnails"
                 :key="image.src"
                 type="button"
                 class="room-thumbnail"
@@ -1073,6 +1162,18 @@ onUnmounted(() => {
                 @click="selectRoomImage(index)"
               >
                 <img :src="image.src" :alt="image.alt" loading="lazy">
+              </button>
+              <button
+                v-if="remainingGalleryCount"
+                type="button"
+                class="room-thumbnail room-thumbnail-more"
+                :class="{ selected: selectedGalleryIndex >= 4 }"
+                :aria-pressed="selectedGalleryIndex >= 4"
+                :aria-label="`ดูรูปที่เหลืออีก ${remainingGalleryCount} รูป`"
+                @click="openLightbox(4)"
+              >
+                <span>+{{ remainingGalleryCount }}</span>
+                <small>รูป</small>
               </button>
             </div>
           </div>
@@ -1119,46 +1220,8 @@ onUnmounted(() => {
             <p v-else class="feature-empty">ไม่มีข้อมูลอุปกรณ์</p>
           </div>
           <p v-if="detailError" class="detail-error" role="alert">{{ detailError }}</p>
-        </aside>
-
-        <header class="schedule-heading">
-          <div class="schedule-title-group">
-            <span class="schedule-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24"><path d="M7 3v3M17 3v3M4 8h16M5 5h14a1 1 0 0 1 1 1v14H4V6a1 1 0 0 1 1-1Z" /><path d="M8 12h3M13 12h3M8 16h3M13 16h3" /></svg>
-            </span>
-            <div><h2 id="schedule-title">ตารางการใช้ห้อง</h2><p>{{ scheduleDateLabel }}</p></div>
-          </div>
-          <span>{{ selectedDaySchedules.length }} รายการ</span>
-        </header>
-        <div v-if="!selectedDaySchedules.length" class="schedule-empty">
-          {{ activeOverviewView === "rooms" ? "ไม่มีรายการในวันปัจจุบัน" : "ไม่มีรายการในวันที่เลือก" }}
-        </div>
-        <div v-else class="schedule-table" role="table" :aria-label="`ตารางการใช้ห้อง ${scheduleDateLabel}`">
-          <div class="schedule-table-head" role="row">
-            <span role="columnheader">เวลา</span>
-            <span role="columnheader">ห้อง</span>
-            <span role="columnheader">รายวิชา / ผู้สอน</span>
-            <span role="columnheader">สถานะ</span>
-          </div>
-          <div class="schedule-table-body" role="rowgroup">
-            <div
-              v-for="item in selectedDaySchedules"
-              :key="`${item.schedule_id ?? item.id ?? item.rowId}-${item.roomcode}-${item.startTime}`"
-              class="schedule-table-row"
-              role="row"
-            >
-              <time role="cell">{{ item.startTime }}–{{ item.finishTime }}</time>
-              <strong class="schedule-room" role="cell">{{ item.roomcode || selectedRoomCode }}</strong>
-              <div class="schedule-subject" role="cell">
-                <span class="schedule-course">{{ scheduleTitle(item) }}</span>
-                <span class="schedule-owner">ผู้สอน: {{ scheduleOwner(item) || "—" }}</span>
-              </div>
-              <span class="schedule-state" :class="scheduleTone(item)" role="cell">{{ scheduleStatus(item) }}</span>
-            </div>
-          </div>
-        </div>
       </section>
-    </section>
+    </dialog>
   </div>
 
   <Teleport to="body">
@@ -1246,6 +1309,7 @@ onUnmounted(() => {
   --dt-amber: #8a5000;
   --dt-amber-soft: #fff7e8;
   --dt-gray: #5f6f82;
+  --dt-info-secondary: #64748b;
   --dt-room-card: #edf2f7;
   --dt-room-shadow: 0 3px 9px rgb(15 23 42 / 0.1);
   --dt-room-shadow-hover: 0 7px 16px rgb(15 23 42 / 0.14);
@@ -1276,6 +1340,7 @@ onUnmounted(() => {
   --dt-amber: #dca84e;
   --dt-amber-soft: #3d2f18;
   --dt-gray: #94a3b8;
+  --dt-info-secondary: #a8b5c7;
   --dt-room-card: #273549;
   --dt-room-shadow: 0 3px 10px rgb(0 0 0 / 0.24);
   --dt-room-shadow-hover: 0 7px 18px rgb(0 0 0 / 0.32);
@@ -1285,6 +1350,7 @@ onUnmounted(() => {
 .overview-grid,
 .overview-main,
 .lower-grid { display: contents; }
+.mobile-current-time { display: none; }
 .kpi-grid { grid-column: 1; grid-row: 1; }
 .calendar-panel-expanded { grid-column: 1; grid-row: 2; }
 .status-panel { grid-column: 1; grid-row: 2; }
@@ -1421,8 +1487,8 @@ onUnmounted(() => {
 .room-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); column-gap: 0.5rem; row-gap: 0.56rem; min-width: 0; min-height: 0; padding: 0.16rem 0.16rem 0.34rem; }
 .room-card { position: relative; display: flex; flex-direction: column; align-items: stretch; min-width: 0; min-height: 5.7rem; padding: 0.58rem 0.64rem; overflow: hidden; border: 1px solid var(--room-tone-border, var(--dt-border)); border-left-width: 4px; border-left-color: var(--room-tone-accent, var(--dt-gray)); border-radius: 10px; background: var(--room-tone-bg, var(--dt-room-card)); color: var(--dt-text); box-shadow: var(--dt-room-shadow); transition: border-color 140ms ease-out, background-color 140ms ease-out, box-shadow 140ms ease-out, transform 140ms ease-out; }
 .room-card:hover { background: color-mix(in srgb, var(--room-tone-bg, var(--dt-room-card)) 82%, var(--dt-blue-soft)); box-shadow: var(--dt-room-shadow-hover); transform: translateY(-1px); }
-.room-card-main { display: flex; flex: 1; min-width: 0; flex-direction: column; align-items: stretch; padding: 0; border: 0; background: transparent; color: inherit; text-align: left; font: inherit; cursor: pointer; }
-.room-card-main:focus-visible,
+.room-card-main { display: flex; flex: 1; min-width: 0; flex-direction: column; align-items: stretch; color: inherit; text-align: left; }
+.room-detail-button:focus-visible,
 .room-book-button:focus-visible,
 .calendar-controls button:focus-visible,
 .day-cell:focus-visible,
@@ -1447,6 +1513,7 @@ onUnmounted(() => {
 .room-card.selected .room-instructor,
 .room-card.selected .people-count { color: #fff; }
 .room-card-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 0.42rem; }
+.room-card-head-actions { display: inline-flex; align-items: center; gap: 0.34rem; }
 .room-title { display: flex; min-width: 0; align-items: center; gap: 0.32rem; }
 .room-card-head strong { min-width: 0; overflow: hidden; font-size: 0.94rem; text-overflow: ellipsis; white-space: nowrap; }
 .status-dot { width: 0.52rem; height: 0.52rem; flex: 0 0 auto; border-radius: 50%; background: currentColor; }
@@ -1460,8 +1527,17 @@ onUnmounted(() => {
 .room-subject { color: var(--dt-text); font-weight: 650; }
 .room-instructor { color: var(--dt-soft); font-weight: 400; }
 .people-count { color: var(--dt-blue); font-weight: 650; }
-.room-book-button { align-self: flex-end; margin-top: 0.3rem; padding: 0.24rem 0.56rem; border: 1px solid #1d4ed8; border-radius: 6px; background: #1d4ed8; color: #fff; box-shadow: 0 2px 5px rgb(29 78 216 / 0.24); font: inherit; font-size: calc(0.66rem + 2px); font-weight: 750; cursor: pointer; transition: background-color 140ms ease-out, border-color 140ms ease-out, box-shadow 140ms ease-out, transform 140ms ease-out; }
+.room-card-actions { display: flex; align-items: stretch; justify-content: flex-end; gap: 0.3rem; margin-top: 0.34rem; }
+.room-detail-button,
+.room-book-button { min-height: 2rem; padding: 0.24rem 0.5rem; border-radius: 6px; font: inherit; font-size: calc(0.66rem + 2px); font-weight: 750; line-height: 1.2; cursor: pointer; transition: background-color 140ms ease-out, border-color 140ms ease-out, box-shadow 140ms ease-out, transform 140ms ease-out; }
+.room-detail-button { width: 1.7rem; min-width: 1.7rem; min-height: 1.7rem; flex: 0 0 auto; padding: 0; border: 0; background: transparent; color: var(--dt-info-secondary); box-shadow: none; }
+.room-detail-button svg { width: 1.15rem; height: 1.15rem; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.room-detail-button:hover { background: var(--dt-blue-soft); transform: translateY(-1px); }
+.room-detail-button:active { background: color-mix(in srgb, var(--dt-blue) 16%, transparent); transform: none; }
+.room-book-button { flex: 0 0 auto; border: 1px solid #1d4ed8; background: #1d4ed8; color: #fff; box-shadow: 0 2px 5px rgb(29 78 216 / 0.24); }
 .room-book-button:hover { border-color: #1e40af; background: #1e40af; box-shadow: 0 3px 7px rgb(30 64 175 / 0.3); transform: translateY(-1px); }
+.room-card.selected .room-detail-button { background: transparent; color: #fff; }
+.room-card.selected .room-detail-button:hover { background: rgb(255 255 255 / 0.16); }
 .room-card.selected .room-book-button { border-color: rgb(255 255 255 / 0.5); background: rgb(255 255 255 / 0.16); color: #fff; }
 
 .panel-state,
@@ -1471,6 +1547,9 @@ onUnmounted(() => {
 .panel-state button { border: 1px solid var(--dt-border); border-radius: 6px; padding: 0.35rem 0.6rem; background: var(--dt-surface); color: var(--dt-text); font: inherit; cursor: pointer; }
 
 .room-detail-panel { min-width: 0; min-height: 0; padding: 0.62rem; overflow-y: auto; background: color-mix(in srgb, var(--dt-blue-soft) 20%, var(--dt-surface)); scrollbar-width: thin; }
+.room-detail-dialog { width: min(92vw, 42rem); max-width: none; max-height: min(90dvh, 48rem); padding: 0; overflow: hidden; border: 1px solid var(--dt-border); border-radius: 14px; background: var(--dt-surface); color: var(--dt-text); box-shadow: 0 24px 70px rgb(15 23 42 / 0.34); }
+.room-detail-dialog::backdrop { background: rgb(15 23 42 / 0.68); backdrop-filter: blur(3px); }
+.modal-room-detail { max-height: min(90dvh, 48rem); overflow-y: auto; border: 0; border-radius: 14px; box-shadow: none; }
 .schedule-room-detail { flex: 0 0 auto; max-height: min(19rem, 46dvh); margin: -0.5rem -0.58rem 0.48rem; border: 0; border-bottom: 1px solid var(--dt-border); border-radius: 0; box-shadow: none; }
 .detail-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.6rem; margin-bottom: 0.38rem; }
 .detail-heading h2 { font-size: 1.14rem; }
@@ -1500,6 +1579,9 @@ onUnmounted(() => {
 .room-thumbnail:focus-visible { outline: 2px solid var(--dt-blue); outline-offset: 2px; }
 .room-thumbnail.selected { border-color: var(--dt-blue); box-shadow: 0 2px 7px rgb(37 99 235 / 0.2); }
 .room-thumbnail img { width: 100%; height: 100%; object-fit: cover; }
+.room-thumbnail-more { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.05rem; border-color: color-mix(in srgb, var(--dt-blue) 24%, var(--dt-border)); background: var(--dt-blue-soft); color: var(--dt-blue); }
+.room-thumbnail-more span { font-size: 1rem; font-weight: 850; line-height: 1; }
+.room-thumbnail-more small { font-size: 0.62rem; font-weight: 700; }
 .image-empty { display: flex; flex-direction: column; align-items: center; gap: 0.35rem; color: var(--dt-soft); font-size: 0.68rem; }
 .image-empty svg { width: 2.25rem; height: 2.25rem; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
 
@@ -1559,18 +1641,21 @@ onUnmounted(() => {
 .schedule-room-detail .detail-error { font-size: calc(0.68rem + 3px); }
 .schedule-room-detail .room-facts dd,
 .schedule-room-detail .feature-heading h3 { font-size: calc(0.74rem + 3px); }
-.schedule-room-detail .chip-row {
+.schedule-room-detail .chip-row,
+.modal-room-detail .chip-row {
   flex-wrap: wrap;
   align-items: flex-start;
   overflow: visible;
 }
-.schedule-room-detail .feature-chip {
+.schedule-room-detail .feature-chip,
+.modal-room-detail .feature-chip {
   max-width: 100%;
   overflow: visible;
   line-height: 1.35;
   white-space: normal;
 }
-.schedule-room-detail .feature-chip > span {
+.schedule-room-detail .feature-chip > span,
+.modal-room-detail .feature-chip > span {
   overflow: visible;
   overflow-wrap: anywhere;
   text-overflow: clip;
@@ -1646,6 +1731,7 @@ onUnmounted(() => {
 .schedule-table-head > * + * { border-left: 1px solid color-mix(in srgb, var(--dt-border) 70%, transparent); }
 .schedule-table-body { flex: 1 1 auto; min-height: 0; overflow-x: hidden; overflow-y: auto; scrollbar-width: thin; }
 .schedule-table-row { border-bottom: 1px solid var(--dt-border); font-size: 0.86rem; }
+.schedule-table-row.past { background: color-mix(in srgb, var(--dt-surface-alt) 62%, var(--dt-page)); opacity: 0.45; filter: grayscale(0.7) saturate(0.12); }
 .schedule-table-row > * { min-width: 0; padding: 0.42rem 0.44rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .schedule-table-row > * + * { border-left: 1px solid color-mix(in srgb, var(--dt-border) 70%, transparent); }
 .schedule-table-row time { justify-self: start; margin-left: 0.32rem; padding: 0.22rem 0.34rem; border-radius: 6px; background: var(--dt-blue-soft); color: var(--dt-blue); font-size: 0.78rem; font-weight: 850; font-variant-numeric: tabular-nums; }
@@ -1695,65 +1781,211 @@ onUnmounted(() => {
 }
 
 @media (max-width: 620px) {
-  .dashboard-test-page { gap: 0.46rem; min-height: calc(100dvh - 3.35rem); padding: 0.46rem; }
+  .dashboard-test-page { gap: 0.36rem; min-height: calc(100dvh - 3.35rem); padding: 0.34rem; font-size: 15px; }
   .overview-main { min-height: 0; grid-template-rows: auto auto; }
-  .time-icon { width: 2.1rem; height: 2.1rem; }
-  .time-label { font-size: 1.65rem; }
-  .live-indicator { font-size: 0.66rem; }
-  .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .kpi-card { min-height: 4.75rem; }
-  .status-panel { min-height: 23rem; padding: 0.58rem; }
+  .overview-grid,
+  .overview-main,
+  .lower-grid { gap: 0.34rem; }
+  .mobile-current-time {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.38rem;
+    width: 100%;
+    padding: 0.3rem 0;
+    text-align: center;
+  }
+  .time-strip { min-height: 2.7rem; padding: 0.26rem 0.42rem; }
+  .current-time { gap: 0.38rem; }
+  .time-icon { width: 1.8rem; height: 1.8rem; border-radius: 8px; }
+  .time-icon svg { width: 1.08rem; height: 1.08rem; }
+  .date-label { font-size: calc(0.66rem + 1px); }
+  .time-label { font-size: calc(1.35rem + 1px); }
+  .live-indicator { gap: 0.26rem; font-size: calc(0.62rem + 1px); }
+  .live-dot { width: 0.42rem; height: 0.42rem; }
+  .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.3rem; }
+  .kpi-card { grid-template-columns: 2rem minmax(0, 1fr); gap: 0.42rem; min-height: 4rem; padding: 0.38rem 0.5rem; }
+  .kpi-icon { width: 1.95rem; height: 1.95rem; border-radius: 8px; }
+  .kpi-icon svg { width: 1.2rem; height: 1.2rem; }
+  .kpi-card p { font-size: calc(0.72rem + 1px); }
+  .kpi-card strong { font-size: calc(1.25rem + 1px); }
+  .kpi-card strong small { font-size: calc(0.7rem + 1px); }
+  .kpi-card div > span { font-size: calc(0.68rem + 1px); }
+  .status-panel { min-height: 0; height: auto; padding: 0.44rem; overflow: visible; border-radius: 12px; }
   .section-heading { flex-direction: column; align-items: stretch; }
-  .status-panel > .section-heading { grid-template-columns: minmax(0, 1fr); gap: 0.58rem; }
-  .status-current-time { grid-column: 1; grid-row: 1; justify-self: start; }
-  .status-title-group { grid-column: 1; grid-row: 2; justify-self: center; }
-  .status-heading-side { grid-column: 1; grid-row: 3; width: 100%; flex-direction: row; align-items: center; justify-content: space-between; }
-  .status-legend { justify-content: flex-start; }
-  .room-floor-groups { max-height: 18rem; }
-  .room-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .section-heading { gap: 0.4rem; margin-bottom: 0.4rem; }
+  .status-panel > .section-heading { grid-template-columns: minmax(0, 1fr); gap: 0.4rem; }
+  .status-current-time,
+  .calendar-heading .current-time { display: none; }
+  .status-title-group { grid-column: 1; grid-row: 1; justify-self: center; }
+  .status-heading-side { grid-column: 1; grid-row: 2; width: 100%; flex-direction: row; align-items: center; justify-content: space-between; }
+  .status-title-group h2 { font-size: calc(1rem + 1px); }
+  .view-switch-button { min-height: 1.72rem; padding: 0.22rem 0.4rem; border-radius: 7px; font-size: calc(0.7rem + 1px); }
+  .view-switch-button svg { width: 0.82rem; height: 0.82rem; }
+  .status-legend { justify-content: flex-start; gap: 0.18rem 0.42rem; font-size: calc(0.68rem + 1px); }
+  .status-legend i,
+  .status-badge i { width: 0.36rem; height: 0.36rem; }
+  .room-floor-groups { max-height: none; overflow: visible; }
+  .room-floor-section + .room-floor-section { margin-top: 0.5rem; }
+  .room-floor-heading { position: static; gap: 0.4rem; margin-bottom: 0.26rem; padding: 0.14rem 0.05rem 0.24rem; }
+  .room-floor-heading h3 { font-size: calc(0.78rem + 1px); }
+  .room-floor-heading > span { padding: 0.12rem 0.3rem; font-size: calc(0.62rem + 1px); }
+  .room-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 0.34rem; row-gap: 0.36rem; padding: 0.1rem 0.1rem 0.22rem; }
+  .room-card { min-height: 4.65rem; padding: 0.4rem 0.46rem; border-radius: 8px; }
+  .room-card-head { gap: 0.3rem; }
+  .room-card-head-actions { gap: 0.25rem; }
+  .room-title { gap: 0.24rem; }
+  .room-card-head strong { font-size: calc(0.82rem + 1px); }
+  .status-dot { width: 0.42rem; height: 0.42rem; }
+  .room-state-text { font-size: calc(0.7rem + 1px); }
+  .room-context,
+  .room-subject,
+  .room-instructor,
+  .people-count { font-size: calc(0.66rem + 1px); }
+  .room-card-actions { gap: 0.22rem; margin-top: 0.24rem; }
+  .room-detail-button,
+  .room-book-button { min-height: 2rem; padding: 0.2rem 0.36rem; border-radius: 5px; font-size: calc(0.66rem + 1px); }
+  .room-detail-button { width: 1.85rem; min-width: 1.85rem; min-height: 1.85rem; padding: 0; }
+  .room-detail-button svg { width: 1.1rem; height: 1.1rem; }
+  .room-detail-dialog {
+    inset: 0;
+    width: 100vw;
+    max-width: none;
+    height: 100dvh;
+    max-height: none;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+  }
+  .modal-room-detail {
+    width: 100%;
+    height: 100%;
+    max-height: none;
+    padding-top: max(0.58rem, env(safe-area-inset-top));
+    padding-right: max(0.58rem, env(safe-area-inset-right));
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+    padding-left: max(0.58rem, env(safe-area-inset-left));
+    border-radius: 0;
+    box-sizing: border-box;
+  }
   .room-detail-panel { overflow: visible; }
-  .schedule-room-detail { max-height: none; margin-inline: -0.58rem; }
+  .room-detail-dialog .modal-room-detail { overflow-y: auto; }
+  .room-detail-panel { padding: 0.44rem; }
+  .detail-heading { gap: 0.4rem; margin-bottom: 0.28rem; }
+  .detail-heading h2 { font-size: calc(0.94rem + 1px); }
+  .detail-heading p { font-size: calc(0.68rem + 1px); }
+  .detail-close { width: 1.65rem; height: 1.65rem; border-radius: 7px; }
+  .status-badge { gap: 0.24rem; padding: 0.2rem 0.4rem; font-size: calc(0.6rem + 1px); }
+  .schedule-room-detail { max-height: none; margin: -0.38rem -0.42rem 0.36rem; }
   .room-image,
-  .room-image img { max-height: 12rem; }
+  .room-image img { height: 7rem; min-height: 7rem; max-height: 7rem; }
+  .room-gallery.has-thumbnails .room-image { height: 6.5rem; min-height: 6.5rem; max-height: 6.5rem; }
+  .room-detail-dialog .modal-room-detail .room-image,
+  .room-detail-dialog .modal-room-detail .room-image img {
+    height: clamp(14rem, 34dvh, 22rem);
+    min-height: clamp(14rem, 34dvh, 22rem);
+    max-height: clamp(14rem, 34dvh, 22rem);
+  }
+  .room-detail-dialog .modal-room-detail .room-gallery.has-thumbnails .room-image {
+    height: clamp(13rem, 32dvh, 20rem);
+    min-height: clamp(13rem, 32dvh, 20rem);
+    max-height: clamp(13rem, 32dvh, 20rem);
+  }
+  .schedule-room-detail .room-image { height: 8rem; min-height: 8rem; max-height: 8rem; }
+  .schedule-room-detail .room-gallery.has-thumbnails .room-image { height: 7.5rem; min-height: 7.5rem; max-height: 7.5rem; }
+  .room-thumbnail { width: 5.5rem; height: 3.8rem; border-radius: 7px; }
+  .room-thumbnail-more span { font-size: calc(1rem + 1px); }
+  .room-thumbnail-more small { font-size: calc(0.62rem + 1px); }
+  .room-facts { margin-top: 0.3rem; }
+  .room-facts div { padding: 0.28rem 0.2rem; }
+  .room-facts dt { font-size: calc(0.62rem + 1px); }
+  .room-facts dd { font-size: calc(0.68rem + 1px); }
+  .feature-section { margin-top: 0.26rem; }
+  .feature-heading h3 { font-size: calc(0.68rem + 1px); }
+  .feature-heading > span,
+  .feature-chip,
+  .feature-empty,
+  .detail-error { font-size: calc(0.62rem + 1px); }
+  .feature-chip { padding: 0.16rem 0.28rem; }
+  .feature-chip img { width: 1rem; height: 1rem; }
+  .schedule-room-detail .detail-heading p,
+  .schedule-room-detail .status-badge,
+  .schedule-room-detail .image-zoom-hint,
+  .schedule-room-detail .room-facts dt,
+  .schedule-room-detail .feature-heading > span,
+  .schedule-room-detail .feature-chip,
+  .schedule-room-detail .feature-empty,
+  .schedule-room-detail .detail-error,
+  .modal-room-detail .feature-heading > span,
+  .modal-room-detail .feature-chip,
+  .modal-room-detail .feature-empty,
+  .modal-room-detail .detail-error { font-size: calc(0.66rem + 1px); }
+  .schedule-room-detail .room-facts dd,
+  .schedule-room-detail .feature-heading h3,
+  .modal-room-detail .feature-heading h3 { font-size: calc(0.72rem + 1px); }
+  .modal-room-detail .detail-heading h2 { font-size: calc(1.06rem + 1px); }
+  .modal-room-detail .detail-heading p { font-size: calc(0.8rem + 1px); }
+  .modal-room-detail .status-badge,
+  .modal-room-detail .image-zoom-hint { font-size: calc(0.74rem + 1px); }
+  .modal-room-detail .room-facts dt { font-size: calc(0.74rem + 1px); }
+  .modal-room-detail .room-facts dd { font-size: calc(0.8rem + 1px); }
+  .modal-room-detail .feature-heading h3 { font-size: calc(0.84rem + 1px); }
+  .modal-room-detail .feature-heading > span,
+  .modal-room-detail .feature-chip,
+  .modal-room-detail .feature-empty,
+  .modal-room-detail .detail-error { font-size: calc(0.78rem + 1px); }
+  .modal-room-detail .feature-chip { padding: 0.24rem 0.36rem; line-height: 1.4; }
+  .modal-room-detail .feature-chip img { width: 1.15rem; height: 1.15rem; }
   .room-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .room-facts div:nth-child(3) { border-left: 0; border-top: 1px solid var(--dt-border); }
   .room-facts div:nth-child(4) { border-top: 1px solid var(--dt-border); }
-  .calendar-panel { min-height: 23rem; padding: 0.58rem; }
+  .calendar-panel { min-height: 19rem; padding: 0.44rem; border-radius: 12px; }
   .calendar-heading { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; }
-  .calendar-heading .current-time { grid-column: 1 / -1; grid-row: 1; justify-self: start; margin-bottom: 0.35rem; }
-  .calendar-heading .calendar-controls { grid-column: 2; grid-row: 2; justify-self: center; }
-  .calendar-heading .calendar-actions { grid-column: 3; grid-row: 2; justify-self: end; }
+  .calendar-heading { gap: 0.4rem; margin-bottom: 0.38rem; }
+  .calendar-heading .calendar-controls { grid-column: 2; grid-row: 1; justify-self: center; }
+  .calendar-heading .calendar-actions { grid-column: 3; grid-row: 1; justify-self: end; }
   .calendar-icon,
   .status-icon { display: none; }
-  .calendar-heading h2 { font-size: 0.9rem; }
-  .calendar-controls button { width: 1.8rem; height: 1.8rem; }
-  .calendar-today-button { padding-inline: 0.48rem; }
-  .view-switch-button { padding-inline: 0.48rem; }
-  .calendar-grid { grid-template-rows: 2.15rem repeat(5, minmax(2.2rem, 1fr)); gap: 0.2rem; height: calc(100% - 3rem); }
-  .day-cell { border-radius: 8px; font-size: 0.78rem; }
-  .schedule-panel { min-height: 18rem; }
+  .calendar-heading h2 { font-size: calc(0.82rem + 1px); }
+  .calendar-controls { gap: 0.2rem; }
+  .calendar-controls button { width: 1.65rem; height: 1.65rem; border-radius: 7px; }
+  .calendar-controls .calendar-month-button { min-width: 6rem; padding-inline: 0.35rem; font-size: calc(0.7rem + 1px); }
+  .calendar-today-button { height: 1.65rem; padding-inline: 0.4rem; font-size: calc(0.66rem + 1px); }
+  .calendar-grid { grid-template-rows: 1.8rem repeat(5, minmax(1.85rem, 1fr)); gap: 0.16rem; height: calc(100% - 2.7rem); }
+  .weekday { padding: 0.18rem 0.1rem; border-radius: 7px; }
+  .weekday b { font-size: calc(0.68rem + 1px); }
+  .day-cell { border-radius: 7px; font-size: calc(0.7rem + 1px); }
+  .day-cell i { right: 0.24rem; bottom: 0.2rem; width: 0.3rem; height: 0.3rem; min-width: 0.3rem; }
+  .schedule-panel { min-height: 14rem; padding: 0.4rem 0.44rem; }
+  .schedule-heading { gap: 0.4rem; margin-bottom: 0.2rem; }
+  .schedule-heading h2 { font-size: calc(0.82rem + 1px); }
+  .schedule-heading p { font-size: calc(0.68rem + 1px); }
+  .schedule-heading > span { padding: 0.18rem 0.32rem; font-size: calc(0.56rem + 1px); }
+  .schedule-icon { width: 1.7rem; height: 1.7rem; border-radius: 7px; }
+  .schedule-icon svg { width: 1rem; height: 1rem; }
   .schedule-panel.has-room-detail .schedule-room-detail { flex: 0 0 auto; }
   .schedule-panel.has-room-detail .schedule-table { flex: 0 1 auto; height: auto; max-height: none; }
   .schedule-panel.has-room-detail .schedule-empty { flex: 0 0 5.5rem; height: auto; min-height: 5.5rem; max-height: none; }
   .schedule-table { overflow: visible; border: 0; background: transparent; }
   .schedule-table-head { display: none; }
-  .schedule-table-body { display: flex; flex-direction: column; gap: 0.32rem; overflow: visible; }
-  .schedule-table-row { grid-template-columns: minmax(0, 1fr) auto; gap: 0.12rem 0.5rem; padding: 0.42rem 0.5rem; border: 1px solid var(--dt-border); border-radius: 9px; background: var(--dt-surface-alt); }
+  .schedule-table-body { display: flex; flex-direction: column; gap: 0.24rem; overflow: visible; }
+  .schedule-table-row { grid-template-columns: minmax(0, 1fr) auto; gap: 0.08rem 0.38rem; padding: 0.32rem 0.38rem; border: 1px solid var(--dt-border); border-radius: 7px; background: var(--dt-surface-alt); font-size: calc(0.74rem + 1px); }
   .schedule-table-row > * { padding: 0; border-left: 0; }
-  .schedule-table-row time { grid-column: 1; grid-row: 1; justify-self: start; margin: 0; padding: 0.2rem 0.32rem; }
-  .schedule-room { grid-column: 2; grid-row: 1; text-align: right; }
+  .schedule-table-row time { grid-column: 1; grid-row: 1; justify-self: start; margin: 0; padding: 0.16rem 0.26rem; font-size: calc(0.68rem + 1px); }
+  .schedule-room { grid-column: 2; grid-row: 1; font-size: calc(0.74rem + 1px); text-align: right; }
   .schedule-subject { grid-column: 1 / -1; grid-row: 2; border-right: 0; }
-  .schedule-course { font-size: 0.9rem; }
-  .schedule-state { grid-column: 2; grid-row: 3; }
+  .schedule-course { font-size: calc(0.76rem + 1px); }
+  .schedule-owner { font-size: calc(0.66rem + 1px); }
+  .schedule-state { grid-column: 2; grid-row: 3; padding: 0.16rem 0.28rem; font-size: calc(0.66rem + 1px); }
 }
 
 @media (max-width: 390px) {
-  .dashboard-test-page { font-size: 13px; }
+  .dashboard-test-page { font-size: 14px; }
   .kpi-card { grid-template-columns: 1.9rem minmax(0, 1fr); gap: 0.38rem; padding-inline: 0.42rem; }
   .kpi-icon { width: 1.85rem; height: 1.85rem; }
-  .kpi-card strong { font-size: 1.28rem; }
-  .room-grid { grid-template-columns: 1fr; }
-  .status-panel { min-height: 25rem; }
+  .kpi-card strong { font-size: calc(1.18rem + 1px); }
+  .room-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .status-panel { min-height: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
