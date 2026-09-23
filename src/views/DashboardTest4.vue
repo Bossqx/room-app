@@ -903,13 +903,21 @@ onUnmounted(() => {
           aria-labelledby="room-status-title"
         >
           <div class="section-heading">
-            <div class="status-title-group">
-              <span class="status-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h1M14 9h1M9 13h1M14 13h1M9 17h1M14 17h1" /></svg>
+            <div class="current-time status-current-time">
+              <span class="time-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <circle cx="12" cy="12" r="8.5" />
+                  <path d="M12 7.5V12l3 2" />
+                </svg>
               </span>
               <div>
+                <p class="date-label">{{ dateLabel }}</p>
+                <time class="time-label" :datetime="now.toISOString()" aria-label="เวลาปัจจุบัน">{{ timeLabel }}</time>
+              </div>
+            </div>
+            <div class="status-title-group">
+              <div>
                 <h2 id="room-status-title">สถานะห้องแบบ Real-time</h2>
-                <p>{{ dateLabel }} · สถานะปัจจุบัน</p>
               </div>
             </div>
             <div class="status-heading-side">
@@ -1238,16 +1246,19 @@ onUnmounted(() => {
   --dt-amber: #8a5000;
   --dt-amber-soft: #fff7e8;
   --dt-gray: #5f6f82;
-  --dt-room-card: #f3f6fa;
+  --dt-room-card: #edf2f7;
+  --dt-room-shadow: 0 3px 9px rgb(15 23 42 / 0.1);
+  --dt-room-shadow-hover: 0 7px 16px rgb(15 23 42 / 0.14);
   --dt-panel-shadow: 0 2px 10px rgb(15 23 42 / 0.07);
   display: grid;
-  grid-template-columns: minmax(0, 67fr) minmax(19rem, 33fr);
+  grid-template-columns: minmax(0, 1fr) minmax(19rem, calc(33% + 1.6rem));
   grid-template-rows: 5rem calc(100dvh - 9.6rem);
-  gap: 0.46rem;
+  column-gap: 0.65rem;
+  row-gap: 0.46rem;
   width: 100%;
   min-height: calc(100dvh - 3.1rem);
   min-width: 0;
-  padding: 0.52rem;
+  padding: 0.52rem 35px;
   box-sizing: border-box;
   overflow: visible;
   background: var(--dt-page);
@@ -1266,6 +1277,8 @@ onUnmounted(() => {
   --dt-amber-soft: #3d2f18;
   --dt-gray: #94a3b8;
   --dt-room-card: #273549;
+  --dt-room-shadow: 0 3px 10px rgb(0 0 0 / 0.24);
+  --dt-room-shadow-hover: 0 7px 18px rgb(0 0 0 / 0.32);
   --dt-panel-shadow: 0 3px 14px rgb(0 0 0 / 0.22);
 }
 
@@ -1378,6 +1391,10 @@ onUnmounted(() => {
   background: var(--dt-surface);
 }
 .section-heading { display: flex; align-items: center; justify-content: space-between; gap: 0.7rem; margin-bottom: 0.55rem; }
+.status-panel > .section-heading { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 0.9rem; }
+.status-current-time { grid-column: 1; align-self: start; justify-self: start; }
+.status-title-group { grid-column: 2; justify-self: center; text-align: center; }
+.status-heading-side { grid-column: 3; justify-self: end; }
 .status-heading-side { display: flex; flex-direction: column; align-items: flex-end; gap: 0.38rem; min-width: 0; }
 .section-heading h2,
 .detail-heading h2,
@@ -1397,24 +1414,24 @@ onUnmounted(() => {
 .tone-unknown { color: var(--dt-gray); }
 
 .room-floor-groups { flex: 1; min-width: 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
-.room-floor-section + .room-floor-section { margin-top: 0.5rem; }
-.room-floor-heading { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; margin-bottom: 0.3rem; padding: 0.18rem 0.08rem 0.3rem; border-bottom: 1px solid color-mix(in srgb, var(--dt-blue) 18%, var(--dt-border)); background: var(--dt-surface); }
+.room-floor-section + .room-floor-section { margin-top: 0.72rem; }
+.room-floor-heading { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; margin-bottom: 0.38rem; padding: 0.2rem 0.08rem 0.34rem; border-bottom: 1px solid color-mix(in srgb, var(--dt-blue) 18%, var(--dt-border)); background: var(--dt-surface); }
 .room-floor-heading h3 { margin: 0; color: var(--dt-text); font-size: calc(0.8rem + 2px); line-height: 1.2; font-weight: 850; }
 .room-floor-heading > span { padding: 0.16rem 0.38rem; border-radius: 999px; background: var(--dt-blue-soft); color: var(--dt-blue); font-size: calc(0.64rem + 2px); font-weight: 750; white-space: nowrap; }
-.room-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.32rem; min-width: 0; min-height: 0; padding-top: 1px; }
-.room-card { position: relative; display: flex; flex-direction: column; align-items: stretch; min-width: 0; min-height: 5.5rem; padding: 0.5rem 0.58rem; overflow: hidden; border: 1px solid color-mix(in srgb, var(--dt-border) 88%, var(--dt-blue)); border-left-width: 4px; border-radius: 10px; background: var(--dt-room-card); color: var(--dt-text); transition: border-color 140ms ease-out, background-color 140ms ease-out, box-shadow 140ms ease-out; }
-.room-card:hover { border-color: color-mix(in srgb, var(--dt-blue) 55%, var(--dt-border)); background: var(--dt-blue-soft); }
+.room-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); column-gap: 0.5rem; row-gap: 0.56rem; min-width: 0; min-height: 0; padding: 0.16rem 0.16rem 0.34rem; }
+.room-card { position: relative; display: flex; flex-direction: column; align-items: stretch; min-width: 0; min-height: 5.7rem; padding: 0.58rem 0.64rem; overflow: hidden; border: 1px solid var(--room-tone-border, var(--dt-border)); border-left-width: 4px; border-left-color: var(--room-tone-accent, var(--dt-gray)); border-radius: 10px; background: var(--room-tone-bg, var(--dt-room-card)); color: var(--dt-text); box-shadow: var(--dt-room-shadow); transition: border-color 140ms ease-out, background-color 140ms ease-out, box-shadow 140ms ease-out, transform 140ms ease-out; }
+.room-card:hover { background: color-mix(in srgb, var(--room-tone-bg, var(--dt-room-card)) 82%, var(--dt-blue-soft)); box-shadow: var(--dt-room-shadow-hover); transform: translateY(-1px); }
 .room-card-main { display: flex; flex: 1; min-width: 0; flex-direction: column; align-items: stretch; padding: 0; border: 0; background: transparent; color: inherit; text-align: left; font: inherit; cursor: pointer; }
 .room-card-main:focus-visible,
 .room-book-button:focus-visible,
 .calendar-controls button:focus-visible,
 .day-cell:focus-visible,
 .panel-state button:focus-visible { outline: 2px solid var(--dt-blue); outline-offset: 2px; }
-.room-card.tone-free { border-left-color: color-mix(in srgb, var(--dt-green) 68%, var(--dt-border)); }
-.room-card.tone-busy { border-left-color: color-mix(in srgb, var(--dt-red) 68%, var(--dt-border)); }
-.room-card.tone-scheduled { border-left-color: color-mix(in srgb, var(--dt-amber) 68%, var(--dt-border)); }
-.room-card.tone-unknown { border-left-color: color-mix(in srgb, var(--dt-gray) 68%, var(--dt-border)); }
-.room-card.selected { border-color: var(--dt-blue); background: var(--dt-blue); color: #fff; box-shadow: 0 3px 9px rgb(37 99 235 / 0.24); }
+.room-card.tone-free { --room-tone-bg: color-mix(in srgb, var(--dt-green-soft) 62%, var(--dt-room-card)); --room-tone-border: color-mix(in srgb, var(--dt-green) 24%, var(--dt-border)); --room-tone-accent: color-mix(in srgb, var(--dt-green) 68%, var(--dt-border)); }
+.room-card.tone-busy { --room-tone-bg: color-mix(in srgb, var(--dt-red-soft) 58%, var(--dt-room-card)); --room-tone-border: color-mix(in srgb, var(--dt-red) 24%, var(--dt-border)); --room-tone-accent: color-mix(in srgb, var(--dt-red) 68%, var(--dt-border)); }
+.room-card.tone-scheduled { --room-tone-bg: color-mix(in srgb, var(--dt-amber-soft) 65%, var(--dt-room-card)); --room-tone-border: color-mix(in srgb, var(--dt-amber) 24%, var(--dt-border)); --room-tone-accent: color-mix(in srgb, var(--dt-amber) 68%, var(--dt-border)); }
+.room-card.tone-unknown { --room-tone-bg: var(--dt-room-card); --room-tone-border: var(--dt-border); --room-tone-accent: color-mix(in srgb, var(--dt-gray) 68%, var(--dt-border)); }
+.room-card.selected { border-color: rgb(255 255 255 / 0.52); border-left-color: rgb(255 255 255 / 0.82); background: var(--dt-blue); color: #fff; box-shadow: 0 7px 16px rgb(37 99 235 / 0.28); }
 .room-card.tone-free .status-dot,
 .room-card.tone-free .room-state-text { color: var(--dt-green); }
 .room-card.tone-busy .status-dot,
@@ -1443,8 +1460,8 @@ onUnmounted(() => {
 .room-subject { color: var(--dt-text); font-weight: 650; }
 .room-instructor { color: var(--dt-soft); font-weight: 400; }
 .people-count { color: var(--dt-blue); font-weight: 650; }
-.room-book-button { align-self: flex-end; margin-top: 0.3rem; padding: 0.2rem 0.48rem; border: 1px solid color-mix(in srgb, var(--dt-green) 38%, var(--dt-border)); border-radius: 6px; background: var(--dt-green-soft); color: var(--dt-green); font: inherit; font-size: calc(0.66rem + 2px); font-weight: 750; cursor: pointer; }
-.room-book-button:hover { border-color: var(--dt-green); background: color-mix(in srgb, var(--dt-green) 18%, var(--dt-surface)); }
+.room-book-button { align-self: flex-end; margin-top: 0.3rem; padding: 0.24rem 0.56rem; border: 1px solid #1d4ed8; border-radius: 6px; background: #1d4ed8; color: #fff; box-shadow: 0 2px 5px rgb(29 78 216 / 0.24); font: inherit; font-size: calc(0.66rem + 2px); font-weight: 750; cursor: pointer; transition: background-color 140ms ease-out, border-color 140ms ease-out, box-shadow 140ms ease-out, transform 140ms ease-out; }
+.room-book-button:hover { border-color: #1e40af; background: #1e40af; box-shadow: 0 3px 7px rgb(30 64 175 / 0.3); transform: translateY(-1px); }
 .room-card.selected .room-book-button { border-color: rgb(255 255 255 / 0.5); background: rgb(255 255 255 / 0.16); color: #fff; }
 
 .panel-state,
@@ -1579,7 +1596,7 @@ onUnmounted(() => {
 .calendar-icon svg,
 .status-icon svg { width: 1.45rem; height: 1.45rem; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
 .calendar-heading h2 { font-size: 1.02rem; }
-.status-title-group h2 { font-size: 1.02rem; }
+.status-title-group h2 { font-size: 1.2rem; }
 .calendar-heading h2 span { color: var(--dt-blue); }
 .calendar-controls { display: flex; align-items: center; gap: 0.28rem; }
 .calendar-month-picker { position: relative; display: inline-flex; }
@@ -1687,7 +1704,10 @@ onUnmounted(() => {
   .kpi-card { min-height: 4.75rem; }
   .status-panel { min-height: 23rem; padding: 0.58rem; }
   .section-heading { flex-direction: column; align-items: stretch; }
-  .status-heading-side { width: 100%; flex-direction: row; align-items: center; justify-content: space-between; }
+  .status-panel > .section-heading { grid-template-columns: minmax(0, 1fr); gap: 0.58rem; }
+  .status-current-time { grid-column: 1; grid-row: 1; justify-self: start; }
+  .status-title-group { grid-column: 1; grid-row: 2; justify-self: center; }
+  .status-heading-side { grid-column: 1; grid-row: 3; width: 100%; flex-direction: row; align-items: center; justify-content: space-between; }
   .status-legend { justify-content: flex-start; }
   .room-floor-groups { max-height: 18rem; }
   .room-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

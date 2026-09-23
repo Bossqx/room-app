@@ -14,7 +14,7 @@ const bookingStartTime = ref("");
 const bookingFinishTime = ref("");
 const bookingRoomCode = ref("");
 const bookingDate = ref("");
-const logo = "/icons/icon-192.svg";
+const logo = "/icons/logo.png";
 
 function showBooking(startTime?: string, finishTime?: string, roomCode?: string, bookingDateStr?: string) {
   if (!userStore.isLoggedIn) {
@@ -205,8 +205,10 @@ function handleAuthAction() {
   width: 2rem;
   height: 2rem;
   flex: 0 0 auto;
+  box-sizing: border-box;
+  padding: 0.15rem;
   border-radius: 50%;
-  object-fit: cover;
+  object-fit: contain;
   background: #fff;
   box-shadow: 0 1px 4px rgb(0 0 0 / 0.18);
 }
@@ -422,7 +424,7 @@ function handleAuthAction() {
 
   .test-menu {
     position: fixed;
-    inset: 3.35rem auto 0 0;
+    inset: calc(3.35rem + env(safe-area-inset-top, 0px)) auto 0 0;
     z-index: 60;
     display: flex;
     flex-direction: column;
@@ -431,7 +433,8 @@ function handleAuthAction() {
     width: min(18rem, 84vw);
     padding: 0.8rem;
     box-sizing: border-box;
-    background: color-mix(in srgb, var(--brand-primary, #2563eb) 68%, #071f61);
+    background: #1d4ed8;
+    box-shadow: 8px 0 24px rgb(15 48 138 / 0.22);
     visibility: hidden;
     pointer-events: none;
     transform: translateX(-102%);
@@ -447,13 +450,20 @@ function handleAuthAction() {
   .menu-item {
     justify-content: flex-start;
     min-height: 2.8rem;
+    color: #fff;
     font-size: 0.9rem;
+  }
+
+  .menu-item:hover,
+  .menu-item.active {
+    border-color: rgb(255 255 255 / 0.34);
+    background: rgb(255 255 255 / 0.18);
   }
 
   .drawer-backdrop {
     position: fixed;
-    inset: 3.35rem 0 0;
-    z-index: 55;
+    inset: 0;
+    z-index: 45;
     display: block;
     width: 100%;
     border: 0;

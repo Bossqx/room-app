@@ -210,7 +210,7 @@ function logout() {
 .content {
   flex: 1;
   overflow-y: auto;
-  padding-top: calc(44px + 8rem);
+  padding-top: 44px;
   padding-bottom: 72px;
 }
 

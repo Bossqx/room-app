@@ -33,9 +33,9 @@ function closeRoom() {
   display: flex;
   align-items: stretch;
   width: 100%;
-  min-height: 100vh;
-  margin-top: 32rem;
-  padding-top: 10rem;
+  min-height: calc(100dvh - 108px);
+  margin: 0;
+  padding: 0;
   background: #f5f6f8;
 }
 
@@ -71,7 +71,6 @@ function closeRoom() {
 @media (max-width: 960px) {
   .dashboard-split {
     flex-direction: column;
-    padding-top: 75rem;
   }
   .dashboard-col-left,
   .dashboard-col-right {
