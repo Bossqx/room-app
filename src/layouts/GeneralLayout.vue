@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { useRoute, useRouter } from 'vue-router'
-import { computed } from 'vue'
+import { computed, provide, ref } from 'vue'
 import ThemeToggle from '../views/components/ThemeToggle.vue'
 import LanguageToggle from '../views/components/LanguageToggle.vue'
+import BookingDesktop from '../views/components/BookingDesktop.vue'
 import { useUserStore } from '../stores/user'
 
 const logo = '/icons/icon-192.svg'
@@ -10,6 +11,22 @@ const logo = '/icons/icon-192.svg'
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
+
+const showBookingModal = ref(false)
+const bookingStartTime = ref('')
+const bookingFinishTime = ref('')
+const bookingRoomCode = ref('')
+const bookingDate = ref('')
+
+function showBooking(startTime?: string, finishTime?: string, roomCode?: string, bookingDateStr?: string) {
+  bookingStartTime.value = startTime ?? ''
+  bookingFinishTime.value = finishTime ?? ''
+  bookingRoomCode.value = roomCode ?? ''
+  bookingDate.value = bookingDateStr ?? ''
+  showBookingModal.value = true
+}
+
+provide('showBooking', showBooking)
 
 const menuItems = [
   {
@@ -36,6 +53,7 @@ const menuItems = [
   },
 ]
 
+const visibleMenuItems = computed(() => userStore.isLoggedIn ? menuItems : [])
 const authActionLabel = computed(() => (userStore.isLoggedIn ? 'Logout' : 'Login'))
 
 function isActive(path: string) {
@@ -64,9 +82,9 @@ function handleAuthAction() {
         <span class="brand-title">ระบบบริหารจัดการห้องคอมพิวเตอร์สำนักคอมพิวเตอร์</span>
       </div>
 
-      <nav class="menu" aria-label="เมนูหลัก">
+      <nav v-if="visibleMenuItems.length" class="menu" aria-label="เมนูหลัก">
         <button
-          v-for="item in menuItems"
+          v-for="item in visibleMenuItems"
           :key="item.label"
           type="button"
           class="menu-item"
@@ -97,6 +115,25 @@ function handleAuthAction() {
     <main class="container">
       <RouterView />
     </main>
+
+    <Teleport to="body">
+      <div v-if="showBookingModal" class="booking-overlay" @click.self="showBookingModal = false">
+        <section class="booking-modal" role="dialog" aria-modal="true" aria-label="จองห้อง">
+          <button type="button" class="booking-close" aria-label="ปิดหน้าต่างจองห้อง" @click="showBookingModal = false">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+            </svg>
+          </button>
+          <BookingDesktop
+            :start-time="bookingStartTime"
+            :finish-time="bookingFinishTime"
+            :room-code="bookingRoomCode"
+            :booking-date="bookingDate"
+            @booked="showBookingModal = false"
+          />
+        </section>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -234,6 +271,58 @@ function handleAuthAction() {
   padding-top: 0.5rem;
 }
 
+.booking-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  background: rgb(15 23 42 / 0.65);
+  backdrop-filter: blur(3px);
+}
+
+.booking-modal {
+  position: relative;
+  width: 100%;
+  max-width: 540px;
+  max-height: 90vh;
+  overflow: visible;
+  border-radius: 1rem;
+  box-shadow: 0 25px 60px rgb(0 0 0 / 0.5);
+}
+
+.booking-modal :deep(.page) {
+  position: static !important;
+  inset: auto !important;
+  width: auto !important;
+  height: auto !important;
+  min-height: 0 !important;
+}
+
+.booking-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.booking-close svg { width: 1rem; height: 1rem; }
+.booking-close:hover { background: var(--bg-surface-alt); color: var(--text-primary); }
+.booking-close:focus-visible { outline: 2px solid var(--accent-link); outline-offset: 2px; }
+
 @media (max-width: 1180px) {
   .topbar {
     gap: 0.8rem;
@@ -290,5 +379,7 @@ function handleAuthAction() {
   }
   .menu-item { font-size: 0.78rem; padding: 0.34rem 0.5rem; }
   .container { padding-top: 0.5rem; }
+  .booking-overlay { padding: 0.7rem; }
+  .booking-modal { max-height: calc(100dvh - 1.4rem); overflow-y: auto; }
 }
 </style>

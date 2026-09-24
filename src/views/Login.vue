@@ -16,7 +16,6 @@ const password = ref('')
 const state    = ref<'idle' | 'loading' | 'fail'>('idle')
 const errMsg   = ref('')
 const showPinPopup = ref(false)
-const showErrorPopup = ref(false)
 
 const apiBase   = (config.apiRoute ?? 'https://cosai.nrru.ac.th:8000').replace(/\/$/, '')
 const DEFAULT_PIN = '123456'
@@ -112,7 +111,6 @@ async function login() {
     if (!user) {
       state.value  = 'fail'
       errMsg.value = 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง'
-      showErrorPopup.value = true
       return
     }
     userStore.setUser(user)
@@ -127,7 +125,6 @@ async function login() {
   } catch {
     state.value  = 'fail'
     errMsg.value = 'ไม่สามารถเชื่อมต่อกับระบบได้'
-    showErrorPopup.value = true
   }
 }
 
@@ -135,16 +132,6 @@ function acknowledgePinPopup() {
   showPinPopup.value = false
   goToSchedule()
 }
-
-// Only closes the overlay — errMsg stays in the inline box until the next
-// attempt clears it, so the reason is still on screen after dismissing.
-function dismissErrorPopup() {
-  showErrorPopup.value = false
-}
-
-
-
-
 
 </script>
 
@@ -245,19 +232,6 @@ function dismissErrorPopup() {
       </div>
     </div>
 
-    <!-- Login failure popup -->
-    <div v-if="showErrorPopup" class="pin-overlay" @click.self="dismissErrorPopup">
-      <div class="pin-modal">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="popup-err-icon">
-          <path stroke-linecap="round" stroke-linejoin="round"
-            d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
-        </svg>
-        <p class="pin-title">เข้าสู่ระบบไม่สำเร็จ</p>
-        <p class="popup-err-msg">{{ errMsg }}</p>
-        <p class="pin-hint">โปรดตรวจสอบชื่อผู้ใช้และรหัสผ่าน แล้วลองอีกครั้ง</p>
-        <button class="btn" @click="dismissErrorPopup">ลองอีกครั้ง</button>
-      </div>
-    </div>
   </div>
 </template>
 
@@ -473,20 +447,6 @@ function dismissErrorPopup() {
   margin: 0 0 1.25rem;
   line-height: 1.4;
 }
-.pin-modal .btn { margin-top: 0; }
-
-.popup-err-icon {
-  width: 44px;
-  height: 44px;
-  color: #ef4444;
-  margin: 0 auto 0.75rem;
-  display: block;
-}
-.popup-err-msg {
-  font-size: 1.05rem;
-  font-weight: 600;
-  color: #b91c1c;
-  margin: 0 0 0.75rem;
-}
+.pin-modal .btn { margin: 0 auto; }
 
 </style>

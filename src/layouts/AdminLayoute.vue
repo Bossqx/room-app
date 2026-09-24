@@ -16,6 +16,12 @@ const menuItems = [
     path: '/dashboard',
     icon: 'm2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25',
   },
+  {
+    name: '/admin/dashboard-new',
+    label: 'แดชบอร์ดใหม่',
+    path: '/admin/dashboard-new',
+    icon: 'M3.75 3.75h6v6h-6v-6Zm10.5 0h6v6h-6v-6Zm-10.5 10.5h6v6h-6v-6Zm10.5 0h6v6h-6v-6Z',
+  },
 ]
 
 const adminSubItems = [
@@ -160,7 +166,7 @@ function logout() {
   flex-shrink: 0;
   width: 220px;
   box-sizing: border-box;
-  background: #2563eb;
+  background: var(--brand-primary);
   border-radius: 0 0.6rem 0.6rem 0;
   display: flex;
   flex-direction: column;
@@ -182,13 +188,13 @@ function logout() {
 }
 
 .brand-actions :deep(.language-switch) {
-  color: #fff;
+  color: var(--brand-on-primary);
 }
 
 .brand-title {
   font-size: 1rem;
   font-weight: 700;
-  color: #ffffff;
+  color: var(--brand-on-primary);
   letter-spacing: 0.02em;
 }
 
@@ -208,7 +214,7 @@ function logout() {
   background: transparent;
   border: none;
   border-radius: 0.6rem;
-  color: #ffffff;
+  color: var(--brand-on-primary);
   font-family: 'Kanit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   font-size: 0.85rem;
   font-weight: 500;
@@ -226,13 +232,13 @@ function logout() {
 }
 
 .menu-item:hover {
-  background: rgba(255,255,255,.16);
-  color: #ffffff;
+  background: var(--brand-control-bg);
+  color: var(--brand-on-primary);
 }
 
 .menu-item.active {
-  background: rgba(255,255,255,.24);
-  color: #ffffff;
+  background: var(--brand-control-bg-hover);
+  color: var(--brand-on-primary);
   font-weight: 700;
 }
 
@@ -257,7 +263,7 @@ function logout() {
   gap: 0.2rem;
   margin-top: 0.2rem;
   padding-left: 0.75rem;
-  border-left: 1px solid rgba(255,255,255,.3);
+  border-left: 1px solid var(--brand-control-border);
 }
 
 .menu-item.sub-item {
@@ -267,11 +273,11 @@ function logout() {
 
 .menu-item.logout {
   flex-shrink: 0;
-  color: rgba(255,255,255,.85);
+  color: color-mix(in srgb, var(--brand-on-primary) 85%, transparent);
 }
 .menu-item.logout:hover {
-  background: #ef4444;
-  color: #ffffff;
+  background: var(--status-busy);
+  color: var(--brand-on-primary);
 }
 
 /* ── Container ── */

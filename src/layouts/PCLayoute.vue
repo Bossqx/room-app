@@ -164,7 +164,7 @@ defineExpose({ showBooking })
     <!-- Booking popup -->
     <Teleport to="body">
       <div v-if="showBookingModal" class="booking-overlay" @click.self="showBookingModal = false">
-        <div class="booking-modal">
+        <div class="booking-modal booking-modal--reservation">
           <button class="booking-close" aria-label="ปิดหน้าต่างจองห้อง" @click="showBookingModal = false">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
               <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
@@ -184,7 +184,7 @@ defineExpose({ showBooking })
     <!-- Change PIN popup -->
     <Teleport to="body">
       <div v-if="showChangePinModal" class="booking-overlay" @click.self="showChangePinModal = false">
-        <div class="booking-modal">
+        <div class="booking-modal booking-modal--pin">
           <button class="booking-close" aria-label="ปิดหน้าต่างเปลี่ยนรหัสพิน" @click="showChangePinModal = false">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
               <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
@@ -214,7 +214,7 @@ defineExpose({ showBooking })
   flex-shrink: 0;
   width: 100%;
   box-sizing: border-box;
-  background: #2563eb;
+  background: var(--brand-primary);
   border-radius: 0 0 0.6rem 0.6rem;
   /* border-bottom: 1px solid #cbd5e1; */
   display: flex;
@@ -241,7 +241,7 @@ defineExpose({ showBooking })
 .brand-title {
   font-size: 0.95rem;
   font-weight: 700;
-  color: #ffffff;
+  color: var(--brand-on-primary);
   letter-spacing: 0.02em;
   white-space: nowrap;
 }
@@ -263,7 +263,7 @@ defineExpose({ showBooking })
   background: transparent;
   border: none;
   border-radius: 999px;
-  color: #ffffff;
+  color: var(--brand-on-primary);
   font-family: 'Kanit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   font-size: 0.85rem;
   font-weight: 500;
@@ -277,7 +277,7 @@ defineExpose({ showBooking })
   content: '|';
   position: absolute;
   right: -0.15rem;
-  color: rgba(255,255,255,.35);
+  color: color-mix(in srgb, var(--brand-on-primary) 35%, transparent);
   pointer-events: none;
 }
 
@@ -288,23 +288,23 @@ defineExpose({ showBooking })
 }
 
 .menu-item:hover {
-  background: rgba(255,255,255,.16);
-  color: #ffffff;
+  background: var(--brand-control-bg);
+  color: var(--brand-on-primary);
 }
 
 .menu-item.active {
-  background: rgba(255,255,255,.24);
-  color: #ffffff;
+  background: var(--brand-control-bg-hover);
+  color: var(--brand-on-primary);
   font-weight: 700;
 }
 
 .menu-item.logout {
   flex-shrink: 0;
-  color: rgba(255,255,255,.85);
+  color: color-mix(in srgb, var(--brand-on-primary) 85%, transparent);
 }
 .menu-item.logout:hover {
-  background: #ef4444;
-  color: #ffffff;
+  background: var(--status-busy);
+  color: var(--brand-on-primary);
 }
 
 /* ── Container ── */
@@ -324,11 +324,11 @@ defineExpose({ showBooking })
   display: flex;
   align-items: center;
   gap: 0.35rem;
-  border: 1px solid rgba(255,255,255,.4);
+  border: 1px solid var(--brand-control-border);
   border-radius: 999px;
   padding: 0.2rem 0.6rem;
   font-size: 0.62rem;
-  color: #ffffff;
+  color: var(--brand-on-primary);
   width: fit-content;
 }
 
@@ -340,9 +340,9 @@ defineExpose({ showBooking })
   background: #cbd5e1;
 }
 
-.mqtt-badge.connected    .mqtt-dot { background: #22c55e; box-shadow: 0 0 5px #22c55e88; }
-.mqtt-badge.connecting   .mqtt-dot { background: #f59e0b; }
-.mqtt-badge.disconnected .mqtt-dot { background: #ef4444; }
+.mqtt-badge.connected    .mqtt-dot { background: var(--status-free); box-shadow: 0 0 5px color-mix(in srgb, var(--status-free) 55%, transparent); }
+.mqtt-badge.connecting   .mqtt-dot { background: var(--status-pending); }
+.mqtt-badge.disconnected .mqtt-dot { background: var(--status-busy); }
 
 .mqtt-host { font-family: monospace; letter-spacing: 0.02em; }
 
@@ -367,6 +367,34 @@ defineExpose({ showBooking })
   overflow-y: auto;
   border-radius: 1rem;
   box-shadow: 0 25px 60px rgba(0,0,0,.5);
+}
+
+.booking-modal--reservation {
+  max-width: 540px;
+}
+
+.booking-modal--pin {
+  max-width: 460px;
+}
+
+.booking-modal--reservation,
+.booking-modal--pin {
+  overflow: visible;
+}
+
+.booking-modal--reservation .booking-close,
+.booking-modal--pin .booking-close {
+  top: 1rem;
+  right: 1rem;
+  background: transparent;
+  border-color: var(--border);
+  color: var(--text-secondary);
+}
+
+.booking-modal--reservation .booking-close:hover,
+.booking-modal--pin .booking-close:hover {
+  background: var(--bg-surface-alt);
+  color: var(--text-primary);
 }
 
 .booking-modal :deep(.page) {

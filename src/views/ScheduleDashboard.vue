@@ -278,15 +278,15 @@ onMounted(() => {
 
 <style scoped>
 .viz-root {
-  color-scheme: light;
-  --surface-1: #fcfcfb;
-  --page-plane: #f9f9f7;
-  --text-primary: #0b0b0b;
-  --text-secondary: #52514e;
-  --text-muted: #898781;
-  --gridline: #e1e0d9;
-  --baseline: #c3c2b7;
-  --series-1: #2a78d6;
+  color-scheme: inherit;
+  --surface-1: var(--dashboard-surface);
+  --page-plane: var(--dashboard-page);
+  --text-primary: var(--dashboard-text);
+  --text-secondary: var(--dashboard-text-secondary);
+  --text-muted: var(--dashboard-text-muted);
+  --gridline: var(--dashboard-border);
+  --baseline: var(--dashboard-border-muted);
+  --series-1: var(--dashboard-accent);
 
   min-height: 100vh;
   box-sizing: border-box;
@@ -296,22 +296,10 @@ onMounted(() => {
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
-html[data-theme="dark"] .viz-root {
-  color-scheme: dark;
-  --surface-1: #1a1a19;
-  --page-plane: #0d0d0d;
-  --text-primary: #ffffff;
-  --text-secondary: #c3c2b7;
-  --text-muted: #898781;
-  --gridline: #2c2c2a;
-  --baseline: #383835;
-  --series-1: #3987e5;
-}
-
 .error-box {
-  background: #fee2e2;
-  color: #b91c1c;
-  border: 1px solid #ef4444;
+  background: var(--pill-error-bg);
+  color: var(--pill-error-text);
+  border: 1px solid var(--status-busy);
   border-radius: 0.5rem;
   padding: 0.6rem 0.9rem;
   margin-bottom: 0.75rem;

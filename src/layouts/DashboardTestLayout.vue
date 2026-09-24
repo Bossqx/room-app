@@ -185,8 +185,8 @@ function handleAuthAction() {
   height: 3.1rem;
   padding: 0.32rem 1rem;
   box-sizing: border-box;
-  background: color-mix(in srgb, var(--brand-primary, #2563eb) 68%, #071f61);
-  color: #fff;
+  background: var(--brand-primary);
+  color: var(--brand-on-primary);
   box-shadow: 0 2px 10px rgb(7 31 97 / 0.2);
 }
 
@@ -211,7 +211,7 @@ function handleAuthAction() {
   padding: 0.15rem;
   border-radius: 50%;
   object-fit: contain;
-  background: #fff;
+  background: var(--brand-on-primary);
   box-shadow: 0 1px 4px rgb(0 0 0 / 0.18);
 }
 
@@ -269,8 +269,8 @@ function handleAuthAction() {
 
 .menu-item:hover,
 .menu-item.active {
-  border-color: rgb(255 255 255 / 0.24);
-  background: rgb(255 255 255 / 0.14);
+  border-color: var(--brand-control-border);
+  background: var(--brand-control-bg);
 }
 
 .menu-item.active { box-shadow: inset 0 -2px 0 rgb(255 255 255 / 0.9); }
@@ -298,13 +298,13 @@ function handleAuthAction() {
   padding: 0.28rem 0.68rem;
   border-color: rgb(255 255 255 / 0.32);
   border-radius: 999px;
-  background: rgb(255 255 255 / 0.1);
+  background: var(--brand-control-bg);
   font-size: 0.76rem;
   font-weight: 650;
 }
 
 .auth-button:hover {
-  background: rgb(255 255 255 / 0.2);
+  background: var(--brand-control-bg-hover);
 }
 
 .drawer-toggle,
@@ -360,7 +360,7 @@ function handleAuthAction() {
   border: 0;
   border-radius: 50%;
   background: #6b7280;
-  color: #fff;
+  color: var(--brand-on-primary);
   cursor: pointer;
 }
 
@@ -435,7 +435,7 @@ function handleAuthAction() {
     width: min(18rem, 84vw);
     padding: 0.8rem;
     box-sizing: border-box;
-    background: #1d4ed8;
+    background: var(--brand-primary);
     box-shadow: 8px 0 24px rgb(15 48 138 / 0.22);
     visibility: hidden;
     pointer-events: none;
@@ -452,14 +452,14 @@ function handleAuthAction() {
   .menu-item {
     justify-content: flex-start;
     min-height: 2.8rem;
-    color: #fff;
+    color: var(--brand-on-primary);
     font-size: 0.9rem;
   }
 
   .menu-item:hover,
   .menu-item.active {
-    border-color: rgb(255 255 255 / 0.34);
-    background: rgb(255 255 255 / 0.18);
+    border-color: var(--brand-control-border);
+    background: var(--brand-control-bg-hover);
   }
 
   .drawer-backdrop {

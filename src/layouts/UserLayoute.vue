@@ -183,8 +183,8 @@ function logout() {
   left: 0;
   right: 0;
   height: 44px;
-  background: #2563eb;
-  border-bottom: 1px solid #2563eb;
+  background: var(--brand-primary);
+  border-bottom: 1px solid var(--brand-primary);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -209,7 +209,7 @@ function logout() {
 .top-title {
   font-size: 0.85rem;
   font-weight: 700;
-  color: #ffffff;
+  color: var(--brand-on-primary);
   letter-spacing: 0.03em;
 }
 
@@ -225,10 +225,10 @@ function logout() {
   justify-content: center;
   width: 30px;
   height: 30px;
-  background: rgba(255,255,255,.15);
-  border: 1px solid rgba(255,255,255,.4);
+  background: var(--brand-control-bg);
+  border: 1px solid var(--brand-control-border);
   border-radius: 999px;
-  color: #ffffff;
+  color: var(--brand-on-primary);
   cursor: pointer;
   transition: color .15s, background .15s, border-color .15s;
   -webkit-tap-highlight-color: transparent;
@@ -243,9 +243,9 @@ function logout() {
 
 .logout-btn:hover,
 .logout-btn:active {
-  background: rgba(239,68,68,.08);
-  border-color: #ef4444;
-  color: #ef4444;
+  background: var(--status-busy-soft);
+  border-color: var(--status-busy-text);
+  color: var(--status-busy-text);
 }
 
 .content {
@@ -361,24 +361,24 @@ function logout() {
 }
 
 .nav-item.active {
-  color: #3b82f6;
+  color: var(--accent-link);
 }
 
 .nav-item.active svg {
-  filter: drop-shadow(0 0 6px rgba(59,130,246,.5));
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--accent-link) 50%, transparent));
 }
 
 .nav-item:not(.nav-logout):active,
 .nav-item:not(.nav-logout):hover {
-  background: rgba(59,130,246,.06);
-  color: #3b82f6;
+  background: var(--dashboard-accent-soft);
+  color: var(--accent-link);
 }
 
 .nav-logout { color: var(--text-secondary); }
 .nav-logout:hover,
 .nav-logout:active {
-  background: rgba(239,68,68,.06);
-  color: #ef4444;
+  background: var(--status-busy-soft);
+  color: var(--status-busy-text);
 }
 
 /* ── MQTT badge ── */
@@ -401,15 +401,15 @@ function logout() {
   background: var(--border);
 }
 
-.mqtt-badge.connected    .mqtt-dot { background: #22c55e; box-shadow: 0 0 5px #22c55e88; }
-.mqtt-badge.connecting   .mqtt-dot { background: #f59e0b; }
-.mqtt-badge.disconnected .mqtt-dot { background: #ef4444; }
+.mqtt-badge.connected    .mqtt-dot { background: var(--status-free); box-shadow: 0 0 5px color-mix(in srgb, var(--status-free) 55%, transparent); }
+.mqtt-badge.connecting   .mqtt-dot { background: var(--status-pending); }
+.mqtt-badge.disconnected .mqtt-dot { background: var(--status-busy); }
 
 .mqtt-host { font-family: monospace; letter-spacing: 0.02em; }
 
 .mqtt-msg {
-  background: #dbeafe;
-  color: #1d4ed8;
+  background: var(--dashboard-accent-soft);
+  color: var(--accent-link);
   border-radius: 999px;
   padding: 0.1rem 0.45rem;
   font-size: 0.6rem;

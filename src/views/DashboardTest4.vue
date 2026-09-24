@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, inject, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
+import { useRouter } from "vue-router";
 import config from "../assets/config.json";
 import { locale } from "../i18n";
+import { useUserStore } from "../stores/user";
 
 type LoadState = "loading" | "ready" | "error";
 type RoomTone = "free" | "busy" | "scheduled" | "unknown";
@@ -110,6 +112,8 @@ interface PersonCountEvent {
 }
 
 const API_BASE = (config.apiRoute ?? "http://localhost:8000/").replace(/\/$/, "");
+const router = useRouter();
+const userStore = useUserStore();
 const showBooking = inject<(startTime?: string, finishTime?: string, roomCode?: string, bookingDate?: string) => void>("showBooking");
 const dashboard = ref<DashboardPayload | null>(null);
 const rooms = ref<RoomRecord[]>([]);
@@ -130,6 +134,7 @@ const datePickerInput = ref<HTMLInputElement | null>(null);
 const lightboxImageFailed = ref(false);
 const selectedDate = ref(localDateKey(new Date()));
 const activeOverviewView = ref<OverviewView>("rooms");
+const loginPromptVisible = ref(false);
 const visibleMonth = ref(selectedDate.value.slice(0, 7));
 const now = ref(new Date());
 const imageFailed = ref(false);
@@ -589,7 +594,20 @@ function handleRoomDetailClosed() {
 
 function bookRoom(room: RoomStatusView) {
   if (room.tone !== "free" || !room.bookingStartTime || !room.bookingFinishTime) return;
+  if (!userStore.isLoggedIn) {
+    loginPromptVisible.value = true;
+    return;
+  }
   showBooking?.(room.bookingStartTime, room.bookingFinishTime, room.roomcode, localDateKey(now.value));
+}
+
+function closeLoginPrompt() {
+  loginPromptVisible.value = false;
+}
+
+function goToLogin() {
+  loginPromptVisible.value = false;
+  router.push("/login");
 }
 
 const roomSchedules = computed(() => activeOverviewView.value === "rooms" && selectedRoomCode.value
@@ -1360,6 +1378,34 @@ onUnmounted(() => {
   </div>
 
   <Teleport to="body">
+    <div
+      v-if="loginPromptVisible"
+      class="login-prompt-overlay"
+      role="presentation"
+      @click.self="closeLoginPrompt"
+      @keydown.esc="closeLoginPrompt"
+    >
+      <section class="login-prompt" role="dialog" aria-modal="true" aria-labelledby="login-prompt-title">
+        <button type="button" class="login-prompt-close" aria-label="ปิดข้อความ" @click="closeLoginPrompt">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
+        </button>
+        <span class="login-prompt-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" /></svg>
+        </span>
+        <h2 id="login-prompt-title">กรุณาเข้าสู่ระบบ</h2>
+        <p>คุณต้องเข้าสู่ระบบก่อนจึงจะสามารถจองห้องได้</p>
+        <div class="login-prompt-actions">
+          <button type="button" class="login-prompt-cancel" @click="closeLoginPrompt">ไว้ก่อน</button>
+          <button type="button" class="login-prompt-primary" autofocus @click="goToLogin">
+            ไปหน้าเข้าสู่ระบบ
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+          </button>
+        </div>
+      </section>
+    </div>
+  </Teleport>
+
+  <Teleport to="body">
     <dialog
       ref="lightboxDialog"
       class="room-lightbox"
@@ -1435,20 +1481,20 @@ onUnmounted(() => {
   --dt-text: var(--text-primary, #0f172a);
   --dt-muted: var(--text-secondary, #526174);
   --dt-soft: var(--text-secondary, #475569);
-  --dt-blue: #2563eb;
-  --dt-blue-soft: #eff6ff;
-  --dt-green: #137653;
-  --dt-green-soft: #eaf8f1;
-  --dt-red: #c53b44;
-  --dt-red-soft: #fff0f1;
-  --dt-amber: #8a5000;
-  --dt-amber-soft: #fff7e8;
-  --dt-gray: #5f6f82;
-  --dt-info-secondary: #64748b;
-  --dt-room-card: #edf2f7;
-  --dt-room-shadow: 0 3px 9px rgb(15 23 42 / 0.1);
-  --dt-room-shadow-hover: 0 7px 16px rgb(15 23 42 / 0.14);
-  --dt-panel-shadow: 0 2px 10px rgb(15 23 42 / 0.07);
+  --dt-blue: var(--dashboard-accent);
+  --dt-blue-soft: var(--dashboard-accent-soft);
+  --dt-green: var(--status-free-text);
+  --dt-green-soft: var(--status-free-soft);
+  --dt-red: var(--status-busy-text);
+  --dt-red-soft: var(--status-busy-soft);
+  --dt-amber: var(--status-pending-text);
+  --dt-amber-soft: var(--status-pending-soft);
+  --dt-gray: var(--status-unknown-text);
+  --dt-info-secondary: var(--text-secondary);
+  --dt-room-card: var(--dashboard-surface-muted);
+  --dt-room-shadow: var(--dashboard-shadow);
+  --dt-room-shadow-hover: var(--dashboard-tooltip-shadow);
+  --dt-panel-shadow: var(--dashboard-shadow);
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(19rem, calc(33% + 1.6rem));
   grid-template-rows: 5rem calc(100dvh - 9.6rem);
@@ -1463,23 +1509,6 @@ onUnmounted(() => {
   background: var(--dt-page);
   color: var(--dt-text);
   font-size: 14px;
-}
-
-:global(html[data-theme="dark"] .dashboard-test-page) {
-  --dt-blue: #60a5fa;
-  --dt-blue-soft: #172554;
-  --dt-green: #4fbf92;
-  --dt-green-soft: #12372c;
-  --dt-red: #e97882;
-  --dt-red-soft: #421f25;
-  --dt-amber: #dca84e;
-  --dt-amber-soft: #3d2f18;
-  --dt-gray: #94a3b8;
-  --dt-info-secondary: #a8b5c7;
-  --dt-room-card: #273549;
-  --dt-room-shadow: 0 3px 10px rgb(0 0 0 / 0.24);
-  --dt-room-shadow-hover: 0 7px 18px rgb(0 0 0 / 0.32);
-  --dt-panel-shadow: 0 3px 14px rgb(0 0 0 / 0.22);
 }
 
 .overview-grid,
@@ -1670,8 +1699,8 @@ onUnmounted(() => {
 .room-detail-button svg { width: 1.15rem; height: 1.15rem; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .room-detail-button:hover { background: var(--dt-blue-soft); transform: translateY(-1px); }
 .room-detail-button:active { background: color-mix(in srgb, var(--dt-blue) 16%, transparent); transform: none; }
-.room-book-button { flex: 0 0 auto; border: 1px solid #1d4ed8; background: #1d4ed8; color: #fff; box-shadow: 0 2px 5px rgb(29 78 216 / 0.24); }
-.room-book-button:hover { border-color: #1e40af; background: #1e40af; box-shadow: 0 3px 7px rgb(30 64 175 / 0.3); transform: translateY(-1px); }
+.room-book-button { flex: 0 0 auto; border: 1px solid var(--brand-primary); background: var(--brand-primary); color: var(--brand-on-primary); box-shadow: 0 2px 5px color-mix(in srgb, var(--brand-primary) 24%, transparent); }
+.room-book-button:hover { border-color: color-mix(in srgb, var(--brand-primary) 82%, #000); background: color-mix(in srgb, var(--brand-primary) 82%, #000); box-shadow: 0 3px 7px color-mix(in srgb, var(--brand-primary) 30%, transparent); transform: translateY(-1px); }
 .room-card.selected .room-detail-button { background: transparent; color: #fff; }
 .room-card.selected .room-detail-button:hover { background: rgb(255 255 255 / 0.16); }
 .room-card.selected .room-book-button { border-color: rgb(255 255 255 / 0.5); background: rgb(255 255 255 / 0.16); color: #fff; }
@@ -1685,6 +1714,24 @@ onUnmounted(() => {
 .room-detail-panel { min-width: 0; min-height: 0; padding: 0.62rem; overflow-y: auto; background: color-mix(in srgb, var(--dt-blue-soft) 20%, var(--dt-surface)); scrollbar-width: thin; }
 .room-detail-dialog { width: min(92vw, 42rem); max-width: none; max-height: min(90dvh, 48rem); padding: 0; overflow: hidden; border: 1px solid var(--dt-border); border-radius: 14px; background: var(--dt-surface); color: var(--dt-text); box-shadow: 0 24px 70px rgb(15 23 42 / 0.34); }
 .room-detail-dialog::backdrop { background: rgb(15 23 42 / 0.68); backdrop-filter: blur(3px); }
+.login-prompt-overlay { position: fixed; inset: 0; z-index: 700; display: grid; place-items: center; padding: 1rem; background: rgb(15 23 42 / 0.68); backdrop-filter: blur(3px); }
+.login-prompt { position: relative; width: min(100%, 25rem); box-sizing: border-box; padding: 1.7rem; border-radius: 14px; background: var(--bg-surface); color: var(--text-primary); box-shadow: 0 24px 70px rgb(15 23 42 / 0.34); text-align: center; }
+.login-prompt-icon { display: grid; place-items: center; width: 3rem; height: 3rem; margin: 0 auto 0.85rem; border-radius: 12px; background: var(--dashboard-accent-soft); color: var(--accent-link); }
+.login-prompt-icon svg { width: 1.45rem; height: 1.45rem; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.login-prompt h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.015em; }
+.login-prompt p { margin: 0.4rem auto 0; max-width: 32ch; color: var(--text-secondary); font-size: 0.84rem; line-height: 1.55; }
+.login-prompt-close { position: absolute; top: 0.75rem; right: 0.75rem; display: grid; place-items: center; width: 2rem; height: 2rem; padding: 0; border: 1px solid var(--border); border-radius: 50%; background: transparent; color: var(--text-secondary); cursor: pointer; }
+.login-prompt-close:hover { background: var(--bg-surface-alt); color: var(--text-primary); }
+.login-prompt-close svg { width: 1rem; height: 1rem; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; }
+.login-prompt-actions { display: grid; grid-template-columns: 0.8fr 1.35fr; gap: 0.6rem; margin-top: 1.25rem; }
+.login-prompt-actions button { min-height: 2.65rem; border-radius: 9px; font: inherit; font-size: 0.82rem; font-weight: 750; cursor: pointer; }
+.login-prompt-cancel { border: 1px solid var(--border); background: var(--bg-surface); color: var(--text-secondary); }
+.login-prompt-cancel:hover { background: var(--bg-surface-alt); color: var(--text-primary); }
+.login-prompt-primary { display: inline-flex; align-items: center; justify-content: center; gap: 0.42rem; border: 1px solid var(--brand-primary); background: var(--brand-primary); color: var(--brand-on-primary); }
+.login-prompt-primary:hover { background: color-mix(in srgb, var(--brand-primary) 84%, #000); }
+.login-prompt-primary svg { width: 1rem; height: 1rem; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.login-prompt-actions button:focus-visible,
+.login-prompt-close:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent-link) 28%, transparent); outline-offset: 2px; }
 .modal-room-detail { max-height: min(90dvh, 48rem); overflow-y: auto; border: 0; border-radius: 14px; box-shadow: none; }
 .schedule-room-detail { flex: 0 0 auto; max-height: min(19rem, 46dvh); margin: -0.5rem -0.58rem 0.48rem; border: 0; border-bottom: 1px solid var(--dt-border); border-radius: 0; box-shadow: none; }
 .detail-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.6rem; margin-bottom: 0.38rem; }

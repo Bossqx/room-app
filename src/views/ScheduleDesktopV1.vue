@@ -723,7 +723,7 @@ onUnmounted(() => {
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M6 3v3M18 3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z" />
             </svg>
-            ปฏิทินรวม
+            ตารางรวม
           </button>
           <button type="button" class="btn-mode" :class="{ active: viewMode === 'week' }" @click="setViewMode('week')">
             <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -1206,7 +1206,7 @@ onUnmounted(() => {
   outline: 0;
   background: transparent;
   color: var(--text-primary);
-  color-scheme: light;
+  color-scheme: inherit;
   font: inherit;
   font-size: calc(0.88rem - 1px);
   cursor: pointer;
@@ -1273,7 +1273,7 @@ onUnmounted(() => {
   font-size: 0.7rem;
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  color: #64748b;
+  color: var(--text-muted);
   margin: 0 0 1rem;
 }
 
@@ -1296,7 +1296,7 @@ onUnmounted(() => {
   font-size: 0.68rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: #64748b;
+  color: var(--text-muted);
 }
 
 .input {
@@ -1308,17 +1308,17 @@ onUnmounted(() => {
   padding: 0.55rem 0.75rem;
   outline: none;
   transition: border-color .15s;
-  color-scheme: light;
+  color-scheme: inherit;
 }
-.input:focus { border-color: #3b82f6; }
+.input:focus { border-color: var(--accent-link); }
 
 .btn-search {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  background: linear-gradient(135deg, #3b82f6, #6366f1);
-  color: #fff;
+  background: var(--brand-primary);
+  color: var(--brand-on-primary);
   border: none;
   border-radius: 0.5rem;
   padding: 0.55rem 1.25rem;
@@ -1355,7 +1355,7 @@ onUnmounted(() => {
   cursor: pointer;
 }
 .btn-open-search svg { width: 16px; height: 16px; flex-shrink: 0; color: var(--accent-link); }
-.btn-open-search:hover { border-color: #3b82f6; }
+.btn-open-search:hover { border-color: var(--accent-link); }
 
 .view-toggle {
   display: flex;
@@ -1392,19 +1392,19 @@ onUnmounted(() => {
 .btn-mode:first-child svg { fill: currentColor; stroke: none; }
 .btn-mode:hover { color: var(--text-primary); background: var(--bg-surface); }
 .btn-mode.active {
-  background: var(--accent-link);
-  border-color: var(--accent-link);
-  color: #fff;
+  background: var(--brand-primary);
+  border-color: var(--brand-primary);
+  color: var(--brand-on-primary);
 }
 
 .msg   { padding: 0.65rem 1rem; border-radius: 0.5rem; font-size: 0.875rem; width: 98%; margin: 0 auto; box-sizing: border-box; }
-.muted { color: #64748b; }
-.error-box { background: var(--pill-error-bg); color: var(--pill-error-text); border: 1px solid #ef4444; }
+.muted { color: var(--text-muted); }
+.error-box { background: var(--pill-error-bg); color: var(--pill-error-text); border: 1px solid var(--status-busy); }
 
 .fullscreen-prompt {
   background: var(--pill-amber-bg);
   color: var(--pill-amber-text);
-  border: 1px solid #f59e0b;
+  border: 1px solid var(--status-pending);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1413,7 +1413,7 @@ onUnmounted(() => {
 }
 
 .btn-fullscreen {
-  background: #f59e0b;
+  background: var(--status-pending);
   color: #1e293b;
   border: none;
   border-radius: 0.4rem;
@@ -1423,7 +1423,7 @@ onUnmounted(() => {
   cursor: pointer;
   white-space: nowrap;
 }
-.btn-fullscreen:hover { background: #fbbf24; }
+.btn-fullscreen:hover { filter: brightness(1.08); }
 
 .table-card {
   background: var(--bg-surface);
@@ -1468,7 +1468,7 @@ onUnmounted(() => {
   cursor: pointer;
 }
 .btn-week-nav svg { width: 16px; height: 16px; }
-.btn-week-nav:hover { border-color: #3b82f6; color: var(--accent-link); }
+.btn-week-nav:hover { border-color: var(--accent-link); color: var(--accent-link); }
 
 .week-nav-label {
   font-family: monospace;
@@ -1804,15 +1804,15 @@ onUnmounted(() => {
   border: 1px solid var(--border);
 }
 
-.legend-dot.occupied { background: #dbeafe; border-color: #60a5fa; }
-.legend-dot.available { background: var(--bg-surface); border-color: #93c5fd; }
-.legend-dot.expired { background: #e5e7eb; border-color: #cbd5e1; }
+.legend-dot.occupied { background: var(--dashboard-accent-soft); border-color: var(--accent-link); }
+.legend-dot.available { background: var(--bg-surface); border-color: var(--border); }
+.legend-dot.expired { background: var(--bg-surface-alt); border-color: var(--border); }
 
 .full-grid-scroll {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  scrollbar-color: #94a3b8 transparent;
+  scrollbar-color: var(--text-muted) transparent;
   scrollbar-width: thin;
 }
 
@@ -1907,7 +1907,7 @@ onUnmounted(() => {
 }
 
 .full-grid-cell.occupied {
-  background: color-mix(in srgb, #3b82f6 8%, var(--bg-surface));
+  background: color-mix(in srgb, var(--accent-link) 8%, var(--bg-surface));
 }
 
 .full-schedule-block {
@@ -1915,8 +1915,8 @@ onUnmounted(() => {
   height: 100%;
   padding: 0.4rem 0.5rem;
   border-radius: 0.45rem;
-  background: color-mix(in srgb, #3b82f6 11%, var(--bg-surface));
-  border: 1px solid color-mix(in srgb, #3b82f6 42%, var(--border));
+  background: color-mix(in srgb, var(--accent-link) 11%, var(--bg-surface));
+  border: 1px solid color-mix(in srgb, var(--accent-link) 42%, var(--border));
   box-sizing: border-box;
   overflow: hidden;
 }
@@ -1966,8 +1966,8 @@ onUnmounted(() => {
   bottom: 0.28rem;
   padding: 0.05rem 0.32rem;
   border-radius: 999px;
-  background: var(--accent-link);
-  color: #fff;
+  background: var(--brand-primary);
+  color: var(--brand-on-primary);
   font-size: 0.6rem;
   font-weight: 750;
 }
@@ -2063,7 +2063,7 @@ onUnmounted(() => {
 }
 
 .day-label { font-weight: 700; font-size: calc(0.9rem - 1px); }
-.day-date  { font-family: monospace; font-size: calc(0.75rem - 1px); color: #64748b; margin-top: 0.15rem; }
+.day-date  { font-family: monospace; font-size: calc(0.75rem - 1px); color: var(--text-muted); margin-top: 0.15rem; }
 
 .period-cell {
   border: 1px solid var(--border);
@@ -2074,13 +2074,13 @@ onUnmounted(() => {
 }
 
 .period-cell.filled {
-  background: rgba(59,130,246,.1);
+  background: var(--dashboard-accent-soft);
 }
 
 .period-cell.active {
-  background: rgba(34,197,94,.15);
-  border-color: #22c55e;
-  box-shadow: inset 0 0 0 1px #22c55e;
+  background: var(--status-free-soft);
+  border-color: var(--status-free);
+  box-shadow: inset 0 0 0 1px var(--status-free);
 }
 
 .course-code {
@@ -2114,8 +2114,8 @@ onUnmounted(() => {
   display: block;
   width: 100%;
   margin-top: 0.3rem;
-  background: linear-gradient(135deg, #3b82f6, #6366f1);
-  color: #fff;
+  background: var(--brand-primary);
+  color: var(--brand-on-primary);
   border: none;
   border-radius: 0.35rem;
   padding: 0.25rem 0.4rem;
@@ -2131,7 +2131,7 @@ onUnmounted(() => {
   width: 100%;
   margin-top: 0.3rem;
   background: var(--pill-success-bg);
-  border: 1px solid #22c55e;
+  border: 1px solid var(--status-free);
   color: var(--pill-success-text);
   border-radius: 0.35rem;
   padding: 0.25rem 0.4rem;
@@ -2145,7 +2145,7 @@ onUnmounted(() => {
   width: 100%;
   margin-top: 0.3rem;
   background: var(--pill-success-bg);
-  border: 1px solid #22c55e;
+  border: 1px solid var(--status-free);
   color: var(--pill-success-text);
   border-radius: 0.35rem;
   padding: 0.25rem 0.4rem;
@@ -2157,7 +2157,7 @@ onUnmounted(() => {
 }
 .usage-status-badge.closed {
   background: var(--pill-error-bg);
-  border-color: #ef4444;
+  border-color: var(--status-busy);
   color: var(--pill-error-text);
 }
 
@@ -2166,7 +2166,7 @@ onUnmounted(() => {
   width: 100%;
   margin-top: 0.3rem;
   background: transparent;
-  border: 1px solid #ef4444;
+  border: 1px solid var(--status-busy);
   color: var(--pill-error-text);
   border-radius: 0.35rem;
   padding: 0.25rem 0.4rem;
@@ -2174,7 +2174,7 @@ onUnmounted(() => {
   font-weight: 700;
   cursor: pointer;
 }
-.btn-cancel-cell:hover:not(:disabled) { background: rgba(239,68,68,.1); }
+.btn-cancel-cell:hover:not(:disabled) { background: var(--status-busy-soft); }
 .btn-cancel-cell:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* Solid fill, unlike the outlined Cancel button — deletion is irreversible. */
@@ -2225,9 +2225,9 @@ onUnmounted(() => {
   cursor: pointer;
 }
 .btn-book-empty:hover:not(:disabled) {
-  border-color: #3b82f6;
+  border-color: var(--accent-link);
   color: var(--accent-link);
-  background: rgba(59,130,246,.08);
+  background: var(--dashboard-accent-soft);
 }
 .btn-book-empty:disabled {
   opacity: 0.35;
@@ -2241,8 +2241,8 @@ onUnmounted(() => {
   font-size: calc(0.68rem - 1px);
   font-weight: 600;
 }
-.cancel-msg-cell.ok   { background: var(--pill-success-bg); color: var(--pill-success-text); border: 1px solid #22c55e; }
-.cancel-msg-cell.fail { background: var(--pill-error-bg); color: var(--pill-error-text); border: 1px solid #ef4444; }
+.cancel-msg-cell.ok   { background: var(--pill-success-bg); color: var(--pill-success-text); border: 1px solid var(--status-free); }
+.cancel-msg-cell.fail { background: var(--pill-error-bg); color: var(--pill-error-text); border: 1px solid var(--status-busy); }
 
 @media (max-height: 820px) {
   .page {

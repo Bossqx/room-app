@@ -21,10 +21,10 @@ const AdminMigration = () => import("../views/AdminMigration.vue");
 const SemesterManage = () => import("../views/SemesterManage.vue");
 const AdminManageSchedule = () => import("../views/AdminManageSchedule.vue");
 const Dashboard = () => import("../views/dashboard.vue");
+const AdminDashboard = () => import("../views/AdminDashboard.vue");
 const ScheduleAll = () => import("../views/ScheduleAll.vue");
 const ScheduleDashboard = () => import("../views/ScheduleDashboard.vue");
 const ScheduleInfo = () => import("../views/ScheduleInfo.vue");
-const InformationDashboard = () => import("../views/InformationDashboard.vue");
 const InformationMobile = () => import("../views/InformationMobile.vue");
 const RoomAdmin = () => import("../views/RoomAdmin.vue");
 const AdminCancelRoom = () => import("../views/AdminCancelRoom.vue");
@@ -59,7 +59,7 @@ const router = createRouter({
         {
           path: "dashboard-first",
           name: "dashboard-first",
-          component: InformationDashboard,
+          component: DashboardTest4,
         },
       ],
     },
@@ -157,6 +157,11 @@ const router = createRouter({
       path: "/admin",
       component: AdminLayout,
       children: [
+        {
+          path: "/admin/dashboard-new",
+          name: "/admin/dashboard-new",
+          component: AdminDashboard,
+        },
         { path: "/admin/home", name: "/admin/home", component: AdminMigration },
         {
           path: "/admin/semester",
