@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { useUserStore } from '../stores/user'
 import { useSemesterStore } from '../stores/semester'
 import config from "../assets/config.json"
+import LanguageToggle from './components/LanguageToggle.vue'
 
 const logo = '/icons/icon-192.svg'
 
@@ -110,7 +111,7 @@ async function login() {
     const user = await loginSystem() ?? await loginNRRU()
     if (!user) {
       state.value  = 'fail'
-      errMsg.value = 'Login is incorrect'
+      errMsg.value = 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง'
       showErrorPopup.value = true
       return
     }
@@ -125,7 +126,7 @@ async function login() {
     goToSchedule()
   } catch {
     state.value  = 'fail'
-    errMsg.value = 'Cannot connect to server'
+    errMsg.value = 'ไม่สามารถเชื่อมต่อกับระบบได้'
     showErrorPopup.value = true
   }
 }
@@ -151,26 +152,30 @@ function dismissErrorPopup() {
   <div class="page">
     <div class="bg-grid"></div>
 
+    <div class="login-language">
+      <LanguageToggle />
+    </div>
+
     <div class="panel">
     <div class="console">
       <!-- Brand -->
       <div class="brand">
         <div class="brand-icon">
-          <img :src="logo" alt="Room Manager logo" class="brand-logo" />
+          <img :src="logo" alt="ตราสัญลักษณ์ระบบบริหารจัดการห้อง" class="brand-logo" />
         </div>
         <div>
-          <p class="brand-name">Room Manager</p>
-          <p class="brand-sub">Nakhon Ratchasima Rajabhat University</p>
+          <p class="brand-name">ระบบบริหารจัดการห้อง</p>
+          <p class="brand-sub">มหาวิทยาลัยราชภัฏนครราชสีมา</p>
         </div>
       </div>
 
       <div class="divider"></div>
 
       <!-- Form -->
-      <p class="form-title">Sign in to your account</p>
+      <p class="form-title">เข้าสู่ระบบบัญชีของคุณ</p>
 
       <div class="field">
-        <label class="lbl">Username</label>
+        <label class="lbl">ชื่อผู้ใช้</label>
         <div class="input-wrap">
           <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
             <path stroke-linecap="round" stroke-linejoin="round"
@@ -180,7 +185,7 @@ function dismissErrorPopup() {
             v-model="username"
             type="text"
             class="input"
-            placeholder="Enter your username"
+            placeholder="กรอกชื่อผู้ใช้"
             autocomplete="username"
             :disabled="state === 'loading'"
             @keyup.enter="login"
@@ -189,7 +194,7 @@ function dismissErrorPopup() {
       </div>
 
       <div class="field">
-        <label class="lbl">Password</label>
+        <label class="lbl">รหัสผ่าน</label>
         <div class="input-wrap">
           <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
             <path stroke-linecap="round" stroke-linejoin="round"
@@ -199,7 +204,7 @@ function dismissErrorPopup() {
             v-model="password"
             type="password"
             class="input"
-            placeholder="Enter your password"
+            placeholder="กรอกรหัสผ่าน"
             autocomplete="current-password"
             :disabled="state === 'loading'"
             @keyup.enter="login"
@@ -221,22 +226,22 @@ function dismissErrorPopup() {
         :disabled="!username || !password || state === 'loading'"
       >
         <span v-if="state === 'loading'" class="spinner"></span>
-        {{ state === 'loading' ? 'Signing in…' : 'Sign In' }}
+        {{ state === 'loading' ? 'กำลังเข้าสู่ระบบ…' : 'เข้าสู่ระบบ' }}
       </button>
 
-      <p class="footer">Room Management System &copy; NRRU</p>
+      <p class="footer">ระบบบริหารจัดการห้อง &copy; มหาวิทยาลัยราชภัฏนครราชสีมา</p>
     </div>
     </div>
 
     <!-- First-time PIN popup -->
     <div v-if="showPinPopup" class="pin-overlay">
       <div class="pin-modal">
-        <p class="pin-title">Your Room Access PIN</p>
+        <p class="pin-title">รหัสพินสำหรับเข้าใช้งานห้อง</p>
         <p class="pin-value">{{ DEFAULT_PIN }}</p>
         <p class="pin-hint">
-          Use this PIN to verify room access. You can change it anytime from the PIN menu.
+          ใช้รหัสพินนี้เพื่อยืนยันการเข้าใช้งานห้อง และสามารถเปลี่ยนได้ภายหลังจากเมนูรหัสพิน
         </p>
-        <button class="btn" @click="acknowledgePinPopup">Continue</button>
+        <button class="btn" @click="acknowledgePinPopup">ดำเนินการต่อ</button>
       </div>
     </div>
 
@@ -247,10 +252,10 @@ function dismissErrorPopup() {
           <path stroke-linecap="round" stroke-linejoin="round"
             d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
         </svg>
-        <p class="pin-title">Sign in failed</p>
+        <p class="pin-title">เข้าสู่ระบบไม่สำเร็จ</p>
         <p class="popup-err-msg">{{ errMsg }}</p>
-        <p class="pin-hint">Check your username and password, then try again.</p>
-        <button class="btn" @click="dismissErrorPopup">Try Again</button>
+        <p class="pin-hint">โปรดตรวจสอบชื่อผู้ใช้และรหัสผ่าน แล้วลองอีกครั้ง</p>
+        <button class="btn" @click="dismissErrorPopup">ลองอีกครั้ง</button>
       </div>
     </div>
   </div>
@@ -267,6 +272,14 @@ function dismissErrorPopup() {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   position: relative;
   overflow: hidden;
+}
+
+.login-language {
+  position: fixed;
+  z-index: 10;
+  inset-block-start: max(0.75rem, env(safe-area-inset-top));
+  inset-inline-end: max(0.75rem, env(safe-area-inset-right));
+  color: var(--text-primary);
 }
 
 .bg-grid {

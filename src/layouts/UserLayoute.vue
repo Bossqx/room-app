@@ -4,6 +4,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '../stores/user'
 import config from "../assets/config.json"
 import ThemeToggle from '../views/components/ThemeToggle.vue'
+import LanguageToggle from '../views/components/LanguageToggle.vue'
 import BookingDesktop from '../views/components/BookingDesktop.vue'
 
 const logo = '/icons/icon-192.svg'
@@ -79,7 +80,7 @@ function logout() {
     <!-- Top header bar -->
     <header class="top-bar">
       <div class="top-brand">
-        <img :src="logo" alt="Logo" class="top-logo" />
+        <img :src="logo" alt="ตราสัญลักษณ์ระบบ" class="top-logo" />
         <span class="top-title">ระบบจองห้องคอมพิวเตอร์</span>
       </div>
       <div class="top-right">
@@ -87,8 +88,9 @@ function logout() {
           <span class="mqtt-dot"></span>
           <span class="mqtt-host">{{ mqttHost }}</span>
         </div> -->
+        <LanguageToggle />
         <ThemeToggle />
-        <button class="logout-btn" @click="logout" aria-label="Logout">
+        <button class="logout-btn" @click="logout" aria-label="ออกจากระบบ">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
             <path stroke-linecap="round" stroke-linejoin="round"
               d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" />
@@ -109,7 +111,7 @@ function logout() {
           <path stroke-linecap="round" stroke-linejoin="round"
             d="m2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />
         </svg>
-        <span>Home</span>
+        <span>หน้าหลัก</span>
       </button>
 
       <button class="nav-item" :class="{ active: isActive('/mobile/booking') }" @click="router.push('/mobile/booking')">
@@ -117,7 +119,7 @@ function logout() {
           <path stroke-linecap="round" stroke-linejoin="round"
             d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" />
         </svg>
-        <span>Booking</span>
+        <span>จองห้อง</span>
       </button>
 
       <button class="nav-item" :class="{ active: isActive('/mobile/schedule') }" @click="router.push('/mobile/schedule')">
@@ -125,7 +127,7 @@ function logout() {
           <path stroke-linecap="round" stroke-linejoin="round"
             d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0ZM3.75 12h.007v.008H3.75V12Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm-.375 5.25h.007v.008H3.75v-.008Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />
         </svg>
-        <span>Schedule</span>
+        <span>ตาราง</span>
       </button>
 
       <button class="nav-item" :class="{ active: isActive('/mobile/change-pin') }" @click="router.push({ path: '/mobile/change-pin', query: { user: userStore.userName } })">
@@ -133,7 +135,7 @@ function logout() {
           <path stroke-linecap="round" stroke-linejoin="round"
             d="M15.75 5.25a3 3 0 0 1 3 3m3 0a6 6 0 0 1-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1 1 21.75 8.25Z" />
         </svg>
-        <span>PIN</span>
+        <span>รหัสพิน</span>
       </button>
 
       <button class="nav-item nav-logout" @click="logout">
@@ -141,7 +143,7 @@ function logout() {
           <path stroke-linecap="round" stroke-linejoin="round"
             d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" />
         </svg>
-        <span>Logout</span>
+        <span>ออกจากระบบ</span>
       </button>
     </nav>
 

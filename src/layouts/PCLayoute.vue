@@ -6,6 +6,7 @@ import config from "../assets/config.json"
 import Booking from '../views/components/BookingDesktop.vue'
 import ChangePinDesktop from '../views/components/ChangePinDesktop.vue'
 import ThemeToggle from '../views/components/ThemeToggle.vue'
+import LanguageToggle from '../views/components/LanguageToggle.vue'
 
 const logo = '/icons/icon-192.svg'
 
@@ -77,7 +78,7 @@ function logout() {
 const menuItems = [
   {
     name: 'pc-home',
-    label: 'Home',
+    label: 'หน้าหลัก',
     path: '/desktop/overview',
     icon: 'm2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25',
   },
@@ -99,7 +100,7 @@ const menuItems = [
 
   {
     name: 'pc-change-pin',
-    label: 'จัดการPIN',
+    label: 'จัดการรหัสพิน',
     path: '/desktop/change-pin',
     icon: 'M15.75 5.25a3 3 0 0 1 3 3m3 0a6 6 0 0 1-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1 1 21.75 8.25Z',
   },
@@ -143,6 +144,7 @@ defineExpose({ showBooking })
         </button>
       </nav>
 
+      <LanguageToggle />
       <ThemeToggle />
 
       <button class="menu-item logout" @click="logout">
@@ -150,7 +152,7 @@ defineExpose({ showBooking })
           <path stroke-linecap="round" stroke-linejoin="round"
             d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" />
         </svg>
-        <span>Logout</span>
+        <span>ออกจากระบบ</span>
       </button>
     </header>
 
@@ -163,7 +165,7 @@ defineExpose({ showBooking })
     <Teleport to="body">
       <div v-if="showBookingModal" class="booking-overlay" @click.self="showBookingModal = false">
         <div class="booking-modal">
-          <button class="booking-close" aria-label="Close" @click="showBookingModal = false">
+          <button class="booking-close" aria-label="ปิดหน้าต่างจองห้อง" @click="showBookingModal = false">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
               <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
             </svg>
@@ -183,7 +185,7 @@ defineExpose({ showBooking })
     <Teleport to="body">
       <div v-if="showChangePinModal" class="booking-overlay" @click.self="showChangePinModal = false">
         <div class="booking-modal">
-          <button class="booking-close" aria-label="Close" @click="showChangePinModal = false">
+          <button class="booking-close" aria-label="ปิดหน้าต่างเปลี่ยนรหัสพิน" @click="showChangePinModal = false">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
               <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
             </svg>

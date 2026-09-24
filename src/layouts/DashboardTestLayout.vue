@@ -2,6 +2,7 @@
 import { computed, provide, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import ThemeToggle from "../views/components/ThemeToggle.vue";
+import LanguageToggle from "../views/components/LanguageToggle.vue";
 import BookingDesktop from "../views/components/BookingDesktop.vue";
 import { useUserStore } from "../stores/user";
 
@@ -55,7 +56,7 @@ const menuItems = [
   },
 ];
 
-const authActionLabel = computed(() => (userStore.isLoggedIn ? "Logout" : "Login"));
+const authActionLabel = computed(() => (userStore.isLoggedIn ? "ออกจากระบบ" : "เข้าสู่ระบบ"));
 
 function isActive(path: string) {
   return route.path === path;
@@ -122,6 +123,7 @@ function handleAuthAction() {
       </nav>
 
       <div class="topbar-actions">
+        <LanguageToggle />
         <ThemeToggle />
         <button type="button" class="auth-button" :aria-label="authActionLabel" @click="handleAuthAction">
           <svg viewBox="0 0 24 24" aria-hidden="true">

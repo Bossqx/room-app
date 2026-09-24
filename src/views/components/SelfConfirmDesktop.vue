@@ -1,7 +1,7 @@
 <template>
   <section class="confirm-placeholder">
-    <h2>Confirm class</h2>
-    <p>This confirmation panel is temporarily unavailable.</p>
+    <h2>ยืนยันการเข้าใช้งาน</h2>
+    <p>ส่วนยืนยันการเข้าใช้งานยังไม่พร้อมใช้งานชั่วคราว</p>
   </section>
 </template>
 

@@ -5,7 +5,7 @@ import { useThemeStore } from "../../stores/theme";
 const themeStore = useThemeStore();
 
 const isDark = computed(() => themeStore.theme === "dark");
-const label = computed(() => (isDark.value ? "Switch to light theme" : "Switch to dark theme"));
+const label = computed(() => (isDark.value ? "เปลี่ยนเป็นโหมดสว่าง" : "เปลี่ยนเป็นโหมดมืด"));
 </script>
 
 <template>

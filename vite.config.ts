@@ -19,9 +19,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['icons/icon-192.svg', 'icons/icon-512.svg'],
       manifest: {
-        name: 'Room Manager 27',
-        short_name: 'Room27',
-        description: 'Room booking and schedule display app',
+        name: 'ระบบบริหารจัดการห้องคอมพิวเตอร์',
+        short_name: 'ระบบห้องคอมพิวเตอร์',
+        description: 'ระบบจองห้องและแสดงตารางการใช้ห้องคอมพิวเตอร์',
         theme_color: '#0f172a',
         background_color: '#0f172a',
         display: 'standalone',

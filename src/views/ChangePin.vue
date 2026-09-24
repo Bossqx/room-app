@@ -16,12 +16,12 @@ async function changePin() {
   if (!userName.value || !newPin.value) return
   if (newPin.value.length < 6) {
     state.value   = 'fail'
-    message.value = 'New PIN must be at least 6 characters'
+    message.value = 'รหัสพินใหม่ต้องมีอย่างน้อย 6 หลัก'
     return
   }
   if (newPin.value !== confirmPin.value) {
     state.value   = 'fail'
-    message.value = 'PINs do not match'
+    message.value = 'รหัสพินทั้งสองช่องไม่ตรงกัน'
     return
   }
   state.value   = 'loading'
@@ -32,16 +32,16 @@ async function changePin() {
     const data = await res.json()
     if (data?.Flag) {
       state.value   = 'ok'
-      message.value = 'PIN changed successfully'
+      message.value = 'เปลี่ยนรหัสพินสำเร็จ'
       newPin.value     = ''
       confirmPin.value = ''
     } else {
       state.value   = 'fail'
-      message.value = data?.message || 'Failed to change PIN'
+      message.value = data?.message || 'ไม่สามารถเปลี่ยนรหัสพินได้'
     }
   } catch (err) {
     state.value   = 'fail'
-    message.value = `Error: ${err}`
+    message.value = `เกิดข้อผิดพลาด: ${err}`
   }
 }
 </script>
@@ -49,20 +49,20 @@ async function changePin() {
 <template>
   <div class="page">
     <div class="card">
-      <p class="card-title">Change PIN</p>
-      <p class="sub">Set a new PIN for <strong>{{ userName || 'your account' }}</strong></p>
+      <p class="card-title">เปลี่ยนรหัสพิน</p>
+      <p class="sub">ตั้งรหัสพินใหม่สำหรับ <strong>{{ userName || 'บัญชีของคุณ' }}</strong></p>
 
-      <label class="field-label" for="user-name">Username</label>
+      <label class="field-label" for="user-name">ชื่อผู้ใช้</label>
       <input
         id="user-name"
         v-model="userName"
         type="text"
-        placeholder="Username"
+        placeholder="ชื่อผู้ใช้"
         class="pwd-input full-input"
         :disabled="state === 'loading'"
       />
 
-      <label class="field-label" for="new-pin">New PIN</label>
+      <label class="field-label" for="new-pin">รหัสพินใหม่</label>
       <input
         id="new-pin"
         v-model="newPin"
@@ -70,13 +70,13 @@ async function changePin() {
         inputmode="numeric"
         pattern="[0-9]*"
         autocomplete="off"
-        placeholder="New PIN"
+        placeholder="รหัสพินใหม่"
         class="pwd-input full-input"
         :disabled="state === 'loading'"
         @input="newPin = newPin.replace(/\D/g, '')"
       />
 
-      <label class="field-label" for="confirm-pin">Confirm PIN</label>
+      <label class="field-label" for="confirm-pin">ยืนยันรหัสพิน</label>
       <input
         id="confirm-pin"
         v-model="confirmPin"
@@ -84,7 +84,7 @@ async function changePin() {
         inputmode="numeric"
         pattern="[0-9]*"
         autocomplete="off"
-        placeholder="Confirm PIN"
+        placeholder="ยืนยันรหัสพิน"
         class="pwd-input full-input"
         @keyup.enter="changePin"
         :disabled="state === 'loading'"
@@ -96,7 +96,7 @@ async function changePin() {
         @click="changePin"
         :disabled="!userName || !newPin || !confirmPin || state === 'loading'"
       >
-        {{ state === 'loading' ? 'Saving…' : 'Change PIN' }}
+        {{ state === 'loading' ? 'กำลังบันทึก…' : 'เปลี่ยนรหัสพิน' }}
       </button>
 
       <div v-if="message" class="result" :class="state">

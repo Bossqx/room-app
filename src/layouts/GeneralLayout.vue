@@ -2,6 +2,7 @@
 import { useRoute, useRouter } from 'vue-router'
 import { computed } from 'vue'
 import ThemeToggle from '../views/components/ThemeToggle.vue'
+import LanguageToggle from '../views/components/LanguageToggle.vue'
 import { useUserStore } from '../stores/user'
 
 const logo = '/icons/icon-192.svg'
@@ -81,6 +82,7 @@ function handleAuthAction() {
       </nav>
 
       <div class="right-group">
+        <LanguageToggle />
         <ThemeToggle />
         <button type="button" class="login-link" @click="handleAuthAction">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">

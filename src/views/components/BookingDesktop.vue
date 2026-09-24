@@ -183,7 +183,7 @@ async function submit() {
       throw new Error(`HTTP ${res.status}`)
     } else {
       state.value   = 'ok'
-      message.value = 'Room booked successfully'
+      message.value = 'จองห้องสำเร็จ'
       form.value.subject_code = ''
       form.value.objective    = ''
       form.value.start_time   = ''
@@ -193,7 +193,7 @@ async function submit() {
     }
   } catch (e) {
     state.value   = 'error'
-    message.value = `Booking failed: ${e}`
+    message.value = `ไม่สามารถจองห้องได้: ${e}`
   }
 }
 </script>
@@ -202,22 +202,22 @@ async function submit() {
   <div class="page">
     <div class="card">
       <div class="card-header">
-        <p class="card-title">Book a Room</p>
+        <p class="card-title">จองห้อง</p>
        
       </div>
 
       <!-- Room -->
       <div class="field">
-        <label class="lbl">Room</label>
+        <label class="lbl">ห้อง</label>
         <select v-model="form.room_no" class="input" :disabled="!!props.roomCode">
-          <option value="" disabled>Select a room</option>
+          <option value="" disabled>เลือกห้อง</option>
           <option v-for="r in rooms" :key="r" :value="r">{{ r }}</option>
         </select>
       </div>
 
       <!-- Date -->
           <div class="field">
-        <label class="lbl">Booking Date</label>
+        <label class="lbl">วันที่จอง</label>
          <input v-model="form.booking_date" type="date" class="input" :placeholder="bookingDate"
                @keyup.enter="submit" />
       </div>
@@ -225,8 +225,8 @@ async function submit() {
 
       <!-- Subject code -->
       <div class="field">
-        <label class="lbl">Subject Code / Subject Name</label>
-        <input v-model="form.subject_code" class="input" placeholder="Subject code or name"
+        <label class="lbl">รหัสวิชา / ชื่อวิชา</label>
+        <input v-model="form.subject_code" class="input" placeholder="กรอกรหัสวิชาหรือชื่อวิชา"
                maxlength="20" @keyup.enter="submit" />
         <span class="counter" :class="{ over: form.subject_code.length > 20 }">
           {{ form.subject_code.length }}/20
@@ -235,8 +235,8 @@ async function submit() {
 
       <!-- Objective -->
       <div class="field">
-        <label class="lbl">Objective</label>
-        <textarea v-model="form.objective" class="input textarea" placeholder="Enter objective…"
+        <label class="lbl">วัตถุประสงค์</label>
+        <textarea v-model="form.objective" class="input textarea" placeholder="กรอกวัตถุประสงค์"
                   rows="3" maxlength="1000"></textarea>
         <span class="counter" :class="{ over: form.objective.length > 1000 }">
           {{ form.objective.length }}/1000
@@ -246,20 +246,20 @@ async function submit() {
       <!-- Time -->
       <div class="time-row">
         <div class="field">
-          <label class="lbl">Start Time</label>
+          <label class="lbl">เวลาเริ่มต้น</label>
           <select class="input" v-model="form.start_time">
-            <option value="">— period —</option>
+            <option value="">— เลือกคาบ —</option>
             <option v-for="p in periods" :key="p.period" :value="p.startTime">
-              P{{ String(p.period).padStart(2, '0') }} — {{ p.startTime }}
+              คาบ {{ p.period }} — {{ p.startTime }}
             </option>
           </select>
         </div>
         <div class="field">
-          <label class="lbl">Finish Time</label>
+          <label class="lbl">เวลาสิ้นสุด</label>
           <select class="input" v-model="form.finish_time">
-            <option value="">— period —</option>
+            <option value="">— เลือกคาบ —</option>
             <option v-for="p in periods" :key="p.period" :value="p.finishTime">
-              P{{ String(p.period).padStart(2, '0') }} — {{ p.finishTime }}
+              คาบ {{ p.period }} — {{ p.finishTime }}
             </option>
           </select>
         </div>
@@ -285,7 +285,7 @@ async function submit() {
         <button class="btn" @click="submit"
                 :disabled="!form.room_no || !form.subject_code || !form.start_time || !form.finish_time || state === 'loading'">
           <span v-if="state === 'loading'" class="spinner"></span>
-          {{ state === 'loading' ? 'Booking…' : 'Confirm' }}
+          {{ state === 'loading' ? 'กำลังจอง…' : 'ยืนยันการจอง' }}
         </button>
       </div>
     </div>

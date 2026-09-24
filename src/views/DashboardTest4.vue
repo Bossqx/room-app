@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, inject, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import config from "../assets/config.json";
+import { locale } from "../i18n";
 
 type LoadState = "loading" | "ready" | "error";
 type RoomTone = "free" | "busy" | "scheduled" | "unknown";
@@ -460,7 +461,7 @@ const roomGalleryImages = computed(() => {
       src: /^(https?:|data:|\/)/.test(panorama)
       ? panorama
       : `${API_BASE}/room/get_panorama/${encodeURIComponent(room.room_no)}`,
-      alt: `ภาพ Panorama ห้อง ${room.room_no}`,
+      alt: `ภาพพาโนรามาห้อง ${room.room_no}`,
     });
   }
 
@@ -572,6 +573,10 @@ async function openRoomDetail(roomcode: string) {
   if (roomDetailDialog.value && !roomDetailDialog.value.open) {
     roomDetailDialog.value.showModal();
   }
+}
+
+function selectRoomSchedule(roomcode: string) {
+  selectedRoomCode.value = sameRoom(selectedRoomCode.value, roomcode) ? "" : roomcode;
 }
 
 function closeRoomDetail() {
@@ -810,19 +815,19 @@ onUnmounted(() => {
             <span class="kpi-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h1M14 9h1M9 13h1M14 13h1M9 17h1M14 17h1" /></svg>
             </span>
-            <div><p>ห้องทั้งหมด</p><strong>{{ dashboard?.all_rooms_count ?? rooms.length }} <small>ห้อง</small></strong><span>ข้อมูลห้องในระบบ</span></div>
+            <div><p>ห้องทั้งหมด</p><strong>{{ dashboard?.all_rooms_count ?? rooms.length }} <small translate="no">{{ locale === 'en' ? 'rooms' : 'ห้อง' }}</small></strong><span>ข้อมูลห้องในระบบ</span></div>
           </article>
           <article class="kpi-card kpi-green">
             <span class="kpi-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6" /><circle cx="12" cy="12" r="9" /></svg>
             </span>
-            <div><p>ห้องว่างตอนนี้</p><strong>{{ dashboard?.free_rooms_count ?? 0 }} <small>ห้อง</small></strong><span>พร้อมใช้งาน</span></div>
+            <div><p>ห้องว่างตอนนี้</p><strong>{{ dashboard?.free_rooms_count ?? 0 }} <small translate="no">{{ locale === 'en' ? 'rooms' : 'ห้อง' }}</small></strong><span>พร้อมใช้งาน</span></div>
           </article>
           <article class="kpi-card kpi-red">
             <span class="kpi-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></svg>
             </span>
-            <div><p>กำลังใช้งาน</p><strong>{{ dashboard?.usage_count ?? 0 }} <small>ห้อง</small></strong><span>จากสถานะยืนยัน</span></div>
+            <div><p>กำลังใช้งาน</p><strong>{{ dashboard?.usage_count ?? 0 }} <small translate="no">{{ locale === 'en' ? 'rooms' : 'ห้อง' }}</small></strong><span>จากสถานะยืนยัน</span></div>
           </article>
           <article class="kpi-card kpi-amber">
             <span class="kpi-icon" aria-hidden="true">
@@ -830,14 +835,14 @@ onUnmounted(() => {
             </span>
             <div>
               <p>{{ activeOverviewView === "rooms" ? "ตารางสอนวันนี้" : "ตารางสอนวันที่เลือก" }}</p>
-              <strong>{{ scheduleDateScheduleCount }} <small>รายการ</small></strong>
+              <strong>{{ scheduleDateScheduleCount }} <small translate="no">{{ locale === 'en' ? (scheduleDateScheduleCount === 1 ? 'entry' : 'entries') : 'รายการ' }}</small></strong>
               <span>{{ activeOverviewView === "rooms" ? "รวมทุกห้องวันนี้" : "รวมทุกห้องในวันนั้น" }}</span>
             </div>
           </article>
         </section>
 
         <p class="sr-only" aria-live="polite">
-          กำลังแสดงมุมมอง {{ activeOverviewView === "calendar" ? "ปฏิทิน" : "สถานะห้องแบบ Real-time" }}
+          กำลังแสดงมุมมอง {{ activeOverviewView === "calendar" ? "ปฏิทิน" : "สถานะห้องแบบเรียลไทม์" }}
         </p>
 
         <section
@@ -952,7 +957,7 @@ onUnmounted(() => {
             </div>
             <div class="status-title-group">
               <div>
-                <h2 id="room-status-title">สถานะห้องแบบ Real-time</h2>
+                <h2 id="room-status-title">สถานะห้องแบบเรียลไทม์</h2>
               </div>
             </div>
             <div class="status-heading-side">
@@ -999,6 +1004,13 @@ onUnmounted(() => {
                   :key="room.roomcode"
                   class="room-card"
                   :class="[`tone-${room.tone}`, { selected: sameRoom(room.roomcode, selectedRoomCode) }]"
+                  role="button"
+                  tabindex="0"
+                  :aria-label="`ดูตารางการใช้ห้อง ${room.roomcode}`"
+                  :aria-pressed="sameRoom(room.roomcode, selectedRoomCode)"
+                  @click="selectRoomSchedule(room.roomcode)"
+                  @keydown.enter.self="selectRoomSchedule(room.roomcode)"
+                  @keydown.space.self.prevent="selectRoomSchedule(room.roomcode)"
                 >
                   <div class="room-card-main">
                     <span class="room-card-head">
@@ -1012,7 +1024,7 @@ onUnmounted(() => {
                           class="room-detail-button"
                           :aria-label="roomAriaLabel(room)"
                           title="ดูรายละเอียดห้อง"
-                          @click="openRoomDetail(room.roomcode)"
+                          @click.stop="openRoomDetail(room.roomcode)"
                         >
                           <svg viewBox="0 0 24 24" aria-hidden="true">
                             <circle cx="12" cy="12" r="9" />
@@ -1027,11 +1039,11 @@ onUnmounted(() => {
                       <span class="room-state-text">{{ room.label }}</span>
                       <span class="room-context">{{ room.context }}</span>
                     </span>
-                    <span v-if="room.subjectName" class="room-subject" :title="room.subjectName">
+                    <span v-if="room.subjectName" class="room-subject" :title="room.subjectName" translate="no">
                       {{ room.subjectName }}
                     </span>
                     <span v-if="room.instructorName" class="room-instructor" :title="room.instructorName">
-                      ผู้สอน: {{ room.instructorName }}
+                      ผู้สอน: <span translate="no">{{ room.instructorName }}</span>
                     </span>
                     <span v-if="personCount(room.roomcode) !== undefined" class="people-count">
                       ตรวจพบ {{ personCount(room.roomcode) }} คน
@@ -1042,7 +1054,7 @@ onUnmounted(() => {
                       type="button"
                       class="room-book-button"
                       :aria-label="`จองห้อง ${room.roomcode}`"
-                      @click="bookRoom(room)"
+                      @click.stop="bookRoom(room)"
                     >
                       จองห้อง
                     </button>
@@ -1059,8 +1071,131 @@ onUnmounted(() => {
     <section class="lower-grid" aria-label="ตารางการใช้ห้อง">
       <section
         class="schedule-panel"
+        :class="{ 'has-room-detail': selectedRoomCode }"
         aria-labelledby="schedule-title"
       >
+
+        <section
+          v-if="selectedRoomCode"
+          class="room-detail-panel schedule-room-detail desktop-room-detail"
+          aria-labelledby="desktop-selected-room-title"
+        >
+          <header class="detail-heading">
+            <div>
+              <h2 id="desktop-selected-room-title">ห้อง {{ selectedRoomCode }}</h2>
+              <p>{{ selectedRoom?.room_type || "ไม่มีข้อมูลประเภทห้อง" }}</p>
+            </div>
+            <div class="detail-heading-actions">
+              <span class="status-badge" :class="`tone-${selectedRoomStatus.tone}`">
+                <i aria-hidden="true" />{{ selectedRoomStatus.label }}
+              </span>
+              <button
+                type="button"
+                class="detail-close"
+                aria-label="ปิดรายละเอียดห้อง"
+                @click="selectedRoomCode = ''"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
+              </button>
+            </div>
+          </header>
+
+          <div class="room-gallery" :class="{ 'has-thumbnails': roomGalleryImages.length > 1 }">
+            <div class="room-image" :class="{ empty: !roomImageUrl }">
+              <button
+                v-if="roomImageUrl"
+                type="button"
+                class="room-image-trigger"
+                :aria-label="`เปิดดู${selectedGalleryImage?.alt || `ภาพห้อง ${selectedRoomCode}`}ขนาดใหญ่`"
+                @click="openLightbox()"
+              >
+                <img
+                  :src="roomImageUrl"
+                  :alt="selectedGalleryImage?.alt || `ภาพห้อง ${selectedRoomCode}`"
+                  @error="imageFailed = true"
+                >
+                <span class="image-zoom-hint" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m15.5 15.5 4 4M10.5 7.5v6M7.5 10.5h6" /></svg>
+                  ดูภาพใหญ่
+                </span>
+              </button>
+              <div v-else class="image-empty">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM4 15l4-4 4 4 3-3 5 5M9 9h.01" /></svg>
+                <span>ไม่มีรูปห้องในข้อมูลปัจจุบัน</span>
+              </div>
+            </div>
+
+            <div v-if="roomGalleryImages.length > 1" class="room-thumbnails" aria-label="รูปภาพห้องทั้งหมด">
+              <button
+                v-for="(image, index) in visibleGalleryThumbnails"
+                :key="image.src"
+                type="button"
+                class="room-thumbnail"
+                :class="{ selected: selectedGalleryIndex === index }"
+                :aria-pressed="selectedGalleryIndex === index"
+                :aria-label="`แสดง${image.alt}`"
+                @click="selectRoomImage(index)"
+              >
+                <img :src="image.src" :alt="image.alt" loading="lazy">
+              </button>
+              <button
+                v-if="remainingGalleryCount"
+                type="button"
+                class="room-thumbnail room-thumbnail-more"
+                :class="{ selected: selectedGalleryIndex >= 4 }"
+                :aria-pressed="selectedGalleryIndex >= 4"
+                :aria-label="`ดูรูปที่เหลืออีก ${remainingGalleryCount} รูป`"
+                @click="openLightbox(4)"
+              >
+                <span>+{{ remainingGalleryCount }}</span>
+                <small>รูป</small>
+              </button>
+            </div>
+          </div>
+
+          <dl class="room-facts">
+            <div><dt>อาคาร</dt><dd translate="no">{{ selectedRoom?.building || "ไม่มีข้อมูล" }}</dd></div>
+            <div><dt>ชั้น</dt><dd>{{ selectedRoomStatus.floorNo ?? selectedRoom?.floor_no ?? "ไม่มีข้อมูล" }}</dd></div>
+            <div><dt>คอมพิวเตอร์</dt><dd>{{ selectedRoom?.computer_no ?? "ไม่มีข้อมูล" }}</dd></div>
+            <div><dt>ที่นั่ง</dt><dd>{{ selectedRoom?.seat_no ?? "ไม่มีข้อมูล" }}</dd></div>
+          </dl>
+
+          <div class="feature-section">
+            <div class="feature-heading"><h3>โปรแกรมที่ติดตั้ง</h3><span>{{ activeApplications.length }}</span></div>
+            <p v-if="detailLoading" class="feature-empty" role="status">กำลังโหลด…</p>
+            <div v-else-if="activeApplications.length" class="chip-row">
+              <span v-for="item in activeApplications" :key="featureLabel(item)" class="feature-chip" translate="no">
+                <img
+                  v-if="featureIconUrl(item, 'application')"
+                  :src="featureIconUrl(item, 'application')"
+                  alt=""
+                  loading="lazy"
+                  @error="hideBrokenFeatureIcon"
+                >
+                <span>{{ featureLabel(item) }}</span>
+              </span>
+            </div>
+            <p v-else class="feature-empty">ไม่มีข้อมูลโปรแกรม</p>
+          </div>
+
+          <div class="feature-section">
+            <div class="feature-heading"><h3>อุปกรณ์</h3><span>{{ activeAccessories.length }}</span></div>
+            <div v-if="activeAccessories.length" class="chip-row">
+              <span v-for="item in activeAccessories" :key="featureLabel(item)" class="feature-chip" translate="no">
+                <img
+                  v-if="featureIconUrl(item, 'accessory')"
+                  :src="featureIconUrl(item, 'accessory')"
+                  alt=""
+                  loading="lazy"
+                  @error="hideBrokenFeatureIcon"
+                >
+                <span>{{ featureLabel(item) }}</span>
+              </span>
+            </div>
+            <p v-else class="feature-empty">ไม่มีข้อมูลอุปกรณ์</p>
+          </div>
+          <p v-if="detailError" class="detail-error" role="alert">{{ detailError }}</p>
+        </section>
 
         <header class="schedule-heading">
           <div class="schedule-title-group">
@@ -1093,8 +1228,8 @@ onUnmounted(() => {
               <time role="cell">{{ item.startTime }}–{{ item.finishTime }}</time>
               <strong class="schedule-room" role="cell">{{ item.roomcode || selectedRoomCode }}</strong>
               <div class="schedule-subject" role="cell">
-                <span class="schedule-course">{{ scheduleTitle(item) }}</span>
-                <span class="schedule-owner">ผู้สอน: {{ scheduleOwner(item) || "—" }}</span>
+                <span class="schedule-course" translate="no">{{ scheduleTitle(item) }}</span>
+                <span class="schedule-owner">ผู้สอน: <span translate="no">{{ scheduleOwner(item) || "—" }}</span></span>
               </div>
               <span class="schedule-state" :class="scheduleTone(item)" role="cell">{{ scheduleStatus(item) }}</span>
             </div>
@@ -1179,7 +1314,7 @@ onUnmounted(() => {
           </div>
 
           <dl class="room-facts">
-            <div><dt>อาคาร</dt><dd>{{ selectedRoom?.building || "ไม่มีข้อมูล" }}</dd></div>
+            <div><dt>อาคาร</dt><dd translate="no">{{ selectedRoom?.building || "ไม่มีข้อมูล" }}</dd></div>
             <div><dt>ชั้น</dt><dd>{{ selectedRoomStatus.floorNo ?? selectedRoom?.floor_no ?? "ไม่มีข้อมูล" }}</dd></div>
             <div><dt>คอมพิวเตอร์</dt><dd>{{ selectedRoom?.computer_no ?? "ไม่มีข้อมูล" }}</dd></div>
             <div><dt>ที่นั่ง</dt><dd>{{ selectedRoom?.seat_no ?? "ไม่มีข้อมูล" }}</dd></div>
@@ -1189,7 +1324,7 @@ onUnmounted(() => {
             <div class="feature-heading"><h3>โปรแกรมที่ติดตั้ง</h3><span>{{ activeApplications.length }}</span></div>
             <p v-if="detailLoading" class="feature-empty" role="status">กำลังโหลด…</p>
             <div v-else-if="activeApplications.length" class="chip-row">
-              <span v-for="item in activeApplications" :key="featureLabel(item)" class="feature-chip">
+              <span v-for="item in activeApplications" :key="featureLabel(item)" class="feature-chip" translate="no">
                 <img
                   v-if="featureIconUrl(item, 'application')"
                   :src="featureIconUrl(item, 'application')"
@@ -1206,7 +1341,7 @@ onUnmounted(() => {
           <div class="feature-section">
             <div class="feature-heading"><h3>อุปกรณ์</h3><span>{{ activeAccessories.length }}</span></div>
             <div v-if="activeAccessories.length" class="chip-row">
-              <span v-for="item in activeAccessories" :key="featureLabel(item)" class="feature-chip">
+              <span v-for="item in activeAccessories" :key="featureLabel(item)" class="feature-chip" translate="no">
                 <img
                   v-if="featureIconUrl(item, 'accessory')"
                   :src="featureIconUrl(item, 'accessory')"
@@ -1485,8 +1620,9 @@ onUnmounted(() => {
 .room-floor-heading h3 { margin: 0; color: var(--dt-text); font-size: calc(0.8rem + 2px); line-height: 1.2; font-weight: 850; }
 .room-floor-heading > span { padding: 0.16rem 0.38rem; border-radius: 999px; background: var(--dt-blue-soft); color: var(--dt-blue); font-size: calc(0.64rem + 2px); font-weight: 750; white-space: nowrap; }
 .room-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); column-gap: 0.5rem; row-gap: 0.56rem; min-width: 0; min-height: 0; padding: 0.16rem 0.16rem 0.34rem; }
-.room-card { position: relative; display: flex; flex-direction: column; align-items: stretch; min-width: 0; min-height: 5.7rem; padding: 0.58rem 0.64rem; overflow: hidden; border: 1px solid var(--room-tone-border, var(--dt-border)); border-left-width: 4px; border-left-color: var(--room-tone-accent, var(--dt-gray)); border-radius: 10px; background: var(--room-tone-bg, var(--dt-room-card)); color: var(--dt-text); box-shadow: var(--dt-room-shadow); transition: border-color 140ms ease-out, background-color 140ms ease-out, box-shadow 140ms ease-out, transform 140ms ease-out; }
+.room-card { position: relative; display: flex; flex-direction: column; align-items: stretch; min-width: 0; min-height: calc(5.7rem - 3px); padding: calc(0.58rem - 1.5px) 0.64rem; overflow: hidden; border: 1px solid var(--room-tone-border, var(--dt-border)); border-left-width: 4px; border-left-color: var(--room-tone-accent, var(--dt-gray)); border-radius: 10px; background: var(--room-tone-bg, var(--dt-room-card)); color: var(--dt-text); box-shadow: var(--dt-room-shadow); cursor: pointer; transition: border-color 140ms ease-out, background-color 140ms ease-out, box-shadow 140ms ease-out, transform 140ms ease-out; }
 .room-card:hover { background: color-mix(in srgb, var(--room-tone-bg, var(--dt-room-card)) 82%, var(--dt-blue-soft)); box-shadow: var(--dt-room-shadow-hover); transform: translateY(-1px); }
+.room-card:focus-visible { outline: 2px solid var(--dt-blue); outline-offset: 2px; }
 .room-card-main { display: flex; flex: 1; min-width: 0; flex-direction: column; align-items: stretch; color: inherit; text-align: left; }
 .room-detail-button:focus-visible,
 .room-book-button:focus-visible,
@@ -1530,7 +1666,7 @@ onUnmounted(() => {
 .room-card-actions { display: flex; align-items: stretch; justify-content: flex-end; gap: 0.3rem; margin-top: 0.34rem; }
 .room-detail-button,
 .room-book-button { min-height: 2rem; padding: 0.24rem 0.5rem; border-radius: 6px; font: inherit; font-size: calc(0.66rem + 2px); font-weight: 750; line-height: 1.2; cursor: pointer; transition: background-color 140ms ease-out, border-color 140ms ease-out, box-shadow 140ms ease-out, transform 140ms ease-out; }
-.room-detail-button { width: 1.7rem; min-width: 1.7rem; min-height: 1.7rem; flex: 0 0 auto; padding: 0; border: 0; background: transparent; color: var(--dt-info-secondary); box-shadow: none; }
+.room-detail-button { display: none; width: 1.7rem; min-width: 1.7rem; min-height: 1.7rem; flex: 0 0 auto; padding: 0; border: 0; background: transparent; color: var(--dt-info-secondary); box-shadow: none; }
 .room-detail-button svg { width: 1.15rem; height: 1.15rem; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .room-detail-button:hover { background: var(--dt-blue-soft); transform: translateY(-1px); }
 .room-detail-button:active { background: color-mix(in srgb, var(--dt-blue) 16%, transparent); transform: none; }
@@ -1782,6 +1918,7 @@ onUnmounted(() => {
 
 @media (max-width: 620px) {
   .dashboard-test-page { gap: 0.36rem; min-height: calc(100dvh - 3.35rem); padding: 0.34rem; font-size: 15px; }
+  .desktop-room-detail { display: none; }
   .overview-main { min-height: 0; grid-template-rows: auto auto; }
   .overview-grid,
   .overview-main,
@@ -1845,7 +1982,7 @@ onUnmounted(() => {
   .room-card-actions { gap: 0.22rem; margin-top: 0.24rem; }
   .room-detail-button,
   .room-book-button { min-height: 2rem; padding: 0.2rem 0.36rem; border-radius: 5px; font-size: calc(0.66rem + 1px); }
-  .room-detail-button { width: 1.85rem; min-width: 1.85rem; min-height: 1.85rem; padding: 0; }
+  .room-detail-button { display: inline-flex; width: 1.85rem; min-width: 1.85rem; min-height: 1.85rem; padding: 0; }
   .room-detail-button svg { width: 1.1rem; height: 1.1rem; }
   .room-detail-dialog {
     inset: 0;

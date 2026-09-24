@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '../stores/user'
 import ThemeToggle from '../views/components/ThemeToggle.vue'
+import LanguageToggle from '../views/components/LanguageToggle.vue'
 
 const router    = useRouter()
 const route     = useRoute()
@@ -72,7 +73,10 @@ function logout() {
     <aside class="sidebar">
       <div class="brand">
         <span class="brand-title">Admin</span>
-        <ThemeToggle />
+        <div class="brand-actions">
+          <LanguageToggle />
+          <ThemeToggle />
+        </div>
       </div>
 
       <nav class="menu">
@@ -169,6 +173,16 @@ function logout() {
   align-items: center;
   justify-content: space-between;
   padding: 0.4rem 0.5rem 1rem;
+}
+
+.brand-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.brand-actions :deep(.language-switch) {
+  color: #fff;
 }
 
 .brand-title {

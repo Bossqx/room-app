@@ -101,7 +101,7 @@ async function search() {
     // if (results.value.length) checkExistence(results.value)
   } catch (e) {
     state.value  = 'error'
-    errMsg.value = `Failed to fetch: ${e}`
+    errMsg.value = `ไม่สามารถโหลดข้อมูลได้: ${e}`
   }
 }
 
@@ -119,7 +119,7 @@ async function searchWeek() {
     weekState.value   = weekResults.value.some(d => d.schedule.length) ? 'done' : 'empty'
   } catch (e) {
     weekState.value  = 'error'
-    weekErrMsg.value = `Failed to fetch: ${e}`
+    weekErrMsg.value = `ไม่สามารถโหลดข้อมูลได้: ${e}`
   }
 }
 
@@ -166,9 +166,9 @@ async function confirmCancel(item: ScheduleItem) {
     })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     await sendCancelNotify()
-    cancelMsg.value = { uuid: item.uuid, ok: true,  text: 'Class cancelled successfully' }
+    cancelMsg.value = { uuid: item.uuid, ok: true,  text: 'ยกเลิกการใช้ห้องสำเร็จ' }
   } catch (e) {
-    cancelMsg.value   = { uuid: item.uuid, ok: false, text: `Cancel failed: ${e}` }
+    cancelMsg.value   = { uuid: item.uuid, ok: false, text: `ไม่สามารถยกเลิกได้: ${e}` }
   } finally {
     cancellingId.value = null
   }
@@ -179,13 +179,13 @@ async function confirmCancel(item: ScheduleItem) {
   <div class="page">
     <!-- Query form -->
     <div class="card">
-      <p class="card-title">Room Schedule Enquiry</p>
+      <p class="card-title">ตรวจสอบตารางการใช้ห้อง</p>
 
       <div class="form-row">
         <div class="field">
-          <label class="lbl">Room Code</label>
+          <label class="lbl">ห้อง</label>
           <select v-model="roomCode" class="input">
-            <option value="" disabled>Select a room</option>
+            <option value="" disabled>เลือกห้อง</option>
             <option v-for="r in rooms" :key="r" :value="r">{{ r }}</option>
           </select>
         </div>
@@ -193,21 +193,21 @@ async function confirmCancel(item: ScheduleItem) {
 
         <button class="btn" @click="runSearch" :disabled="!roomCode || (activeTab === 'current' ? state : weekState) === 'loading'">
           <span v-if="(activeTab === 'current' ? state : weekState) === 'loading'" class="spinner"></span>
-          {{ (activeTab === 'current' ? state : weekState) === 'loading' ? 'Searching…' : 'Search' }}
+          {{ (activeTab === 'current' ? state : weekState) === 'loading' ? 'กำลังค้นหา…' : 'ค้นหา' }}
         </button>
       </div>
     </div>
 
     <!-- Tabs -->
     <div class="tabs">
-      <button class="tab" :class="{ active: activeTab === 'current' }" @click="selectTab('current')">Current Schedule</button>
-      <button class="tab" :class="{ active: activeTab === 'week' }" @click="selectTab('week')">Week Schedule</button>
+      <button class="tab" :class="{ active: activeTab === 'current' }" @click="selectTab('current')">ตารางปัจจุบัน</button>
+      <button class="tab" :class="{ active: activeTab === 'week' }" @click="selectTab('week')">ตารางประจำสัปดาห์</button>
     </div>
 
     <template v-if="activeTab === 'current'">
       <!-- States -->
       <div v-if="state === 'error'"   class="msg error-box">{{ errMsg }}</div>
-      <div v-else-if="state === 'empty'" class="msg muted">No schedule found for this room on {{ queryDate }}.</div>
+      <div v-else-if="state === 'empty'" class="msg muted">ไม่พบตารางของห้องนี้ในวันที่ {{ queryDate }}</div>
 
       <!-- Results -->
       <div v-if="state === 'done'" class="results">
@@ -251,7 +251,7 @@ async function confirmCancel(item: ScheduleItem) {
               <path stroke-linecap="round" stroke-linejoin="round"
                 d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
             </svg>
-            {{ cancellingId === item.uuid ? 'Cancelling…' : 'Cancel Class' }}
+            {{ cancellingId === item.uuid ? 'กำลังยกเลิก…' : 'ยกเลิกการใช้ห้อง' }}
           </button>
 
         </div>
@@ -262,7 +262,7 @@ async function confirmCancel(item: ScheduleItem) {
     <template v-else>
       <!-- States -->
       <div v-if="weekState === 'error'"   class="msg error-box">{{ weekErrMsg }}</div>
-      <div v-else-if="weekState === 'empty'" class="msg muted">No schedule found for this room this week.</div>
+      <div v-else-if="weekState === 'empty'" class="msg muted">ไม่พบตารางของห้องนี้ในสัปดาห์นี้</div>
 
       <!-- Results, grouped by day -->
       <div v-if="weekState === 'done'" class="results week-scroll">
@@ -309,7 +309,7 @@ async function confirmCancel(item: ScheduleItem) {
                   <path stroke-linecap="round" stroke-linejoin="round"
                     d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
                 </svg>
-                {{ cancellingId === item.uuid ? 'Cancelling…' : 'Cancel Class' }}
+                {{ cancellingId === item.uuid ? 'กำลังยกเลิก…' : 'ยกเลิกการใช้ห้อง' }}
               </button>
             </div>
           </div>
@@ -328,14 +328,14 @@ async function confirmCancel(item: ScheduleItem) {
               d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
           </svg>
         </div>
-        <p class="modal-title">Cancel Class?</p>
+        <p class="modal-title">ยืนยันการยกเลิกการใช้ห้องหรือไม่</p>
         <p class="modal-body">
           <strong>{{ confirmModal.item?.coursecode }}</strong> — {{ confirmModal.item?.coursename }}<br/>
           <span class="modal-time">{{ confirmModal.item?.startTime }} – {{ confirmModal.item?.finishTime }}</span>
         </p>
         <div class="modal-actions">
-          <button class="modal-btn cancel" @click="modalAnswer(false)">Keep Class</button>
-          <button class="modal-btn confirm" @click="modalAnswer(true)">Yes, Cancel</button>
+          <button class="modal-btn cancel" @click="modalAnswer(false)">ไม่ยกเลิก</button>
+          <button class="modal-btn confirm" @click="modalAnswer(true)">ยืนยันการยกเลิก</button>
         </div>
       </div>
     </div>
