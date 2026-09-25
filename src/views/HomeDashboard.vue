@@ -136,6 +136,7 @@ const selectedDate = ref(localDateKey(new Date()));
 const activeOverviewView = ref<OverviewView>("rooms");
 const loginPromptVisible = ref(false);
 const visibleMonth = ref(selectedDate.value.slice(0, 7));
+const collapsedScheduleGroups = ref<Record<string, boolean>>({ upcoming: false, past: false });
 const now = ref(new Date());
 const imageFailed = ref(false);
 const lastUpdatedAt = ref<Date | null>(null);
@@ -156,6 +157,8 @@ let detailRequestGeneration = 0;
 let initialViewportGuardActive = true;
 let initialViewportFrame: number | null = null;
 let initialViewportTimers: number[] = [];
+let initialViewportInterval: number | null = null;
+let initialViewportReleaseTimer: number | null = null;
 const previousScrollRestoration = typeof window !== "undefined" && "scrollRestoration" in window.history
   ? window.history.scrollRestoration
   : null;
@@ -164,13 +167,24 @@ if (previousScrollRestoration !== null) {
   window.history.scrollRestoration = "manual";
 }
 
-function markInitialViewportInteraction() {
-  initialViewportGuardActive = false;
-}
-
 function keepInitialViewportAtTop() {
   if (!initialViewportGuardActive) return;
   window.scrollTo({ left: 0, top: 0, behavior: "auto" });
+  if (document.scrollingElement) document.scrollingElement.scrollTop = 0;
+  document.documentElement.scrollTop = 0;
+  document.body.scrollTop = 0;
+}
+
+function handleInitialViewportScroll() {
+  if (!initialViewportGuardActive) return;
+  keepInitialViewportAtTop();
+}
+
+function releaseInitialViewportGuard() {
+  initialViewportGuardActive = false;
+  window.removeEventListener("scroll", handleInitialViewportScroll);
+  window.removeEventListener("wheel", releaseInitialViewportGuard);
+  window.removeEventListener("touchmove", releaseInitialViewportGuard);
 }
 
 async function finishInitialViewportReset() {
@@ -187,13 +201,23 @@ async function finishInitialViewportReset() {
   // Mobile browsers can restore the old offset only after async content,
   // fonts, and viewport chrome have settled. Keep a short, bounded guard so
   // the schedule list cannot become the restored scroll anchor.
-  initialViewportTimers = [120, 400, 900, 1500].map((delay, index, delays) => window.setTimeout(() => {
+  initialViewportTimers = [120, 400, 900, 1500, 2500].map((delay, index, delays) => window.setTimeout(() => {
     keepInitialViewportAtTop();
     if (index === delays.length - 1) {
-      initialViewportGuardActive = false;
       initialViewportTimers = [];
     }
   }, delay));
+
+  const guardStartedAt = window.performance.now();
+  initialViewportInterval = window.setInterval(() => {
+    keepInitialViewportAtTop();
+    if (window.performance.now() - guardStartedAt >= 3500) {
+      if (initialViewportInterval !== null) window.clearInterval(initialViewportInterval);
+      initialViewportInterval = null;
+    }
+  }, 100);
+
+  initialViewportReleaseTimer = window.setTimeout(releaseInitialViewportGuard, 15_000);
 }
 
 function localDateKey(date: Date): string {
@@ -668,6 +692,23 @@ const selectedDaySchedules = computed(() => roomSchedules.value
     || left.roomcode.localeCompare(right.roomcode, "th", { numeric: true })),
 );
 
+const scheduleGroups = computed(() => [
+  {
+    key: "upcoming",
+    label: "ตารางที่ยังดำเนินอยู่",
+    items: selectedDaySchedules.value.filter((item) => !isSchedulePast(item)),
+  },
+  {
+    key: "past",
+    label: "ตารางที่สิ้นสุดแล้ว",
+    items: selectedDaySchedules.value.filter(isSchedulePast),
+  },
+].filter((group) => group.items.length));
+
+function toggleScheduleGroup(groupKey: string) {
+  collapsedScheduleGroups.value[groupKey] = !collapsedScheduleGroups.value[groupKey];
+}
+
 const selectedDateScheduleCount = computed(() => schedules.value
   .filter((item) => item.schedule_date?.slice(0, 10) === selectedDate.value)
   .length,
@@ -836,9 +877,9 @@ watch(selectedRoomCode, (roomCode) => {
 });
 
 onMounted(() => {
-  window.addEventListener("touchstart", markInitialViewportInteraction, { passive: true });
-  window.addEventListener("wheel", markInitialViewportInteraction, { passive: true });
-  window.addEventListener("pointerdown", markInitialViewportInteraction, { passive: true });
+  window.addEventListener("scroll", handleInitialViewportScroll, { passive: true });
+  window.addEventListener("wheel", releaseInitialViewportGuard, { passive: true });
+  window.addEventListener("touchmove", releaseInitialViewportGuard, { passive: true });
   keepInitialViewportAtTop();
   selectToday();
   void loadCoreData().finally(finishInitialViewportReset);
@@ -848,12 +889,14 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
-  window.removeEventListener("touchstart", markInitialViewportInteraction);
-  window.removeEventListener("wheel", markInitialViewportInteraction);
-  window.removeEventListener("pointerdown", markInitialViewportInteraction);
   if (initialViewportFrame !== null) window.cancelAnimationFrame(initialViewportFrame);
   initialViewportTimers.forEach((timer) => window.clearTimeout(timer));
   initialViewportTimers = [];
+  if (initialViewportInterval !== null) window.clearInterval(initialViewportInterval);
+  initialViewportInterval = null;
+  if (initialViewportReleaseTimer !== null) window.clearTimeout(initialViewportReleaseTimer);
+  initialViewportReleaseTimer = null;
+  releaseInitialViewportGuard();
   if (previousScrollRestoration !== null) window.history.scrollRestoration = previousScrollRestoration;
   if (clockTimer) clearInterval(clockTimer);
   if (dashboardRefreshTimer) clearInterval(dashboardRefreshTimer);
@@ -1287,23 +1330,50 @@ onUnmounted(() => {
             <span role="columnheader">รายวิชา / ผู้สอน</span>
             <span role="columnheader">สถานะ</span>
           </div>
-          <div class="schedule-table-body" role="rowgroup">
-            <div
-              v-for="item in selectedDaySchedules"
-              :key="`${item.schedule_id ?? item.id ?? item.rowId}-${item.roomcode}-${item.startTime}`"
-              class="schedule-table-row"
-              :class="{ past: isSchedulePast(item) }"
-              :aria-label="isSchedulePast(item) ? 'รายการที่ผ่านมาแล้ว' : undefined"
-              role="row"
+          <div class="schedule-table-body">
+            <section
+              v-for="group in scheduleGroups"
+              :key="group.key"
+              class="schedule-group"
+              :class="`schedule-group-${group.key}`"
             >
-              <time role="cell">{{ item.startTime }}–{{ item.finishTime }}</time>
-              <strong class="schedule-room" role="cell">{{ item.roomcode || selectedRoomCode }}</strong>
-              <div class="schedule-subject" role="cell">
-                <span class="schedule-course" translate="no">{{ scheduleTitle(item) }}</span>
-                <span class="schedule-owner">ผู้สอน: <span translate="no">{{ scheduleOwner(item) || "—" }}</span></span>
+              <button
+                type="button"
+                class="schedule-group-heading"
+                :aria-expanded="!collapsedScheduleGroups[group.key]"
+                :aria-controls="`schedule-group-rows-${group.key}`"
+                @click="toggleScheduleGroup(group.key)"
+              >
+                <span class="schedule-group-name">{{ group.label }}</span>
+                <span class="schedule-group-count">{{ group.items.length }} รายการ</span>
+                <svg class="schedule-group-chevron" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+              </button>
+              <div
+                v-show="!collapsedScheduleGroups[group.key]"
+                :id="`schedule-group-rows-${group.key}`"
+                class="schedule-group-rows"
+                :aria-label="group.label"
+                role="rowgroup"
+              >
+                <div
+                  v-for="item in group.items"
+                  :key="`${item.schedule_id ?? item.id ?? item.rowId}-${item.roomcode}-${item.startTime}`"
+                  class="schedule-table-row"
+                  :class="{ past: group.key === 'past' }"
+                  role="row"
+                >
+                  <time role="cell">{{ item.startTime }}–{{ item.finishTime }}</time>
+                  <strong class="schedule-room" role="cell">{{ item.roomcode || selectedRoomCode }}</strong>
+                  <div class="schedule-subject" role="cell">
+                    <span class="schedule-course" translate="no">{{ scheduleTitle(item) }}</span>
+                    <span class="schedule-owner">ผู้สอน: <span translate="no">{{ scheduleOwner(item) || "—" }}</span></span>
+                  </div>
+                  <span class="schedule-state" :class="scheduleTone(item)" role="cell">{{ scheduleStatus(item) }}</span>
+                </div>
               </div>
-              <span class="schedule-state" :class="scheduleTone(item)" role="cell">{{ scheduleStatus(item) }}</span>
-            </div>
+            </section>
           </div>
         </div>
       </section>
@@ -1325,7 +1395,7 @@ onUnmounted(() => {
               <span class="status-badge" :class="`tone-${selectedRoomStatus.tone}`">
                 <i aria-hidden="true" />{{ selectedRoomStatus.label }}
               </span>
-              <button type="button" class="detail-close" aria-label="ปิดรายละเอียดห้อง" autofocus @click="closeRoomDetail">
+              <button type="button" class="detail-close" aria-label="ปิดรายละเอียดห้อง" @click="closeRoomDetail">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
               </button>
             </div>
@@ -1449,7 +1519,7 @@ onUnmounted(() => {
         <p>คุณต้องเข้าสู่ระบบก่อนจึงจะสามารถจองห้องได้</p>
         <div class="login-prompt-actions">
           <button type="button" class="login-prompt-cancel" @click="closeLoginPrompt">ไว้ก่อน</button>
-          <button type="button" class="login-prompt-primary" autofocus @click="goToLogin">
+          <button type="button" class="login-prompt-primary" @click="goToLogin">
             ไปหน้าเข้าสู่ระบบ
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
           </button>
@@ -1472,7 +1542,7 @@ onUnmounted(() => {
             <h2 id="room-lightbox-title">ห้อง {{ selectedRoomCode }}</h2>
             <p v-if="roomGalleryImages.length > 1">รูปที่ {{ selectedGalleryIndex + 1 }} จาก {{ roomGalleryImages.length }}</p>
           </div>
-          <button type="button" class="lightbox-close" aria-label="ปิดหน้าต่างดูรูป" autofocus @click="closeLightbox">
+          <button type="button" class="lightbox-close" aria-label="ปิดหน้าต่างดูรูป" @click="closeLightbox">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
           </button>
         </header>
@@ -1967,8 +2037,21 @@ onUnmounted(() => {
 .schedule-table-head span { padding: 0.42rem 0.44rem; overflow: hidden; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
 .schedule-table-head > * + * { border-left: 1px solid color-mix(in srgb, var(--dt-border) 70%, transparent); }
 .schedule-table-body { flex: 1 1 auto; min-height: 0; overflow-x: hidden; overflow-y: auto; scrollbar-width: thin; }
+.schedule-group { min-width: 0; }
+.schedule-group-heading { position: sticky; top: 0; z-index: 2; display: grid; grid-template-columns: minmax(0, 1fr) auto 1rem; align-items: center; gap: 0.55rem; width: 100%; min-height: 2rem; padding: 0.32rem 0.7rem; border: 0; border-bottom: 1px solid var(--dt-border); background: color-mix(in srgb, var(--dt-surface-alt) 88%, var(--dt-surface)); color: var(--dt-text); font: inherit; font-size: 0.76rem; font-weight: 800; text-align: left; cursor: pointer; }
+.schedule-group + .schedule-group .schedule-group-heading { border-top: 1px solid var(--dt-border); }
+.schedule-group-heading:hover { background: var(--dt-blue-soft); }
+.schedule-group-heading:focus-visible { z-index: 3; outline: 2px solid var(--dt-blue); outline-offset: -2px; }
+.schedule-group-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.schedule-group-count { color: var(--dt-soft); font-size: 0.68rem; font-weight: 700; white-space: nowrap; }
+.schedule-group-chevron { width: 1rem; height: 1rem; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform 0.18s ease; }
+.schedule-group-heading[aria-expanded="false"] .schedule-group-chevron { transform: rotate(-90deg); }
+.schedule-group-upcoming .schedule-group-name { color: var(--dt-blue); }
 .schedule-table-row { border-bottom: 1px solid var(--dt-border); font-size: 0.86rem; }
-.schedule-table-row.past { background: color-mix(in srgb, var(--dt-surface-alt) 62%, var(--dt-page)); opacity: 0.45; filter: grayscale(0.7) saturate(0.12); }
+.schedule-table-row.past { background: color-mix(in srgb, var(--dt-surface-alt) 72%, var(--dt-page)); }
+.schedule-table-row.past .schedule-room,
+.schedule-table-row.past .schedule-course { color: var(--dt-soft); }
+.schedule-table-row.past time { background: var(--dt-surface-alt); color: var(--dt-soft); }
 .schedule-table-row > * { min-width: 0; padding: 0.42rem 0.44rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .schedule-table-row > * + * { border-left: 1px solid color-mix(in srgb, var(--dt-border) 70%, transparent); }
 .schedule-table-row time { justify-self: start; margin-left: 0.32rem; padding: 0.22rem 0.34rem; border-radius: 6px; background: var(--dt-blue-soft); color: var(--dt-blue); font-size: 0.78rem; font-weight: 850; font-variant-numeric: tabular-nums; }
@@ -2207,6 +2290,11 @@ onUnmounted(() => {
   .schedule-table { overflow: visible; border: 0; background: transparent; }
   .schedule-table-head { display: none; }
   .schedule-table-body { display: flex; flex-direction: column; gap: 0.24rem; overflow: visible; }
+  .schedule-group { display: flex; flex-direction: column; gap: 0.24rem; }
+  .schedule-group-heading { position: static; min-height: 0; margin-top: 0.16rem; padding: 0.3rem 0.38rem; border: 0; border-radius: 6px; background: var(--dt-blue-soft); font-size: calc(0.7rem + 1px); }
+  .schedule-group + .schedule-group { margin-top: 0.24rem; }
+  .schedule-group + .schedule-group .schedule-group-heading { border-top: 0; background: var(--dt-surface-alt); }
+  .schedule-group-count { font-size: calc(0.62rem + 1px); }
   .schedule-table-row { grid-template-columns: minmax(0, 1fr) auto; gap: 0.08rem 0.38rem; padding: 0.32rem 0.38rem; border: 1px solid var(--dt-border); border-radius: 7px; background: var(--dt-surface-alt); font-size: calc(0.74rem + 1px); }
   .schedule-table-row > * { padding: 0; border-left: 0; }
   .schedule-table-row time { grid-column: 1; grid-row: 1; justify-self: start; margin: 0; padding: 0.16rem 0.26rem; font-size: calc(0.68rem + 1px); }

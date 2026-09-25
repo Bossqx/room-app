@@ -9,3 +9,4 @@ config.json
 # OS/editor
 .DS_Store
 .vscode/
+.edge-headless-profile/

@@ -767,17 +767,9 @@ onUnmounted(() => {
 <style scoped>
 * { box-sizing: border-box; }
 
-:global(body) {
-  margin: 0;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 100vh;
-  background: #111827;
-}
-
 .page {
   width: 98vw;
+  max-width: 100%;
   height: 100vh;
   display: flex;
   flex-direction: column;

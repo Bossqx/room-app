@@ -133,11 +133,22 @@ function acknowledgePinPopup() {
   goToSchedule()
 }
 
+function goHome() {
+  router.push('/dashboard-first')
+}
+
 </script>
 
 <template>
   <div class="page">
     <div class="bg-grid"></div>
+
+    <button type="button" class="home-link" aria-label="กลับหน้าหลัก" @click="goHome">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="m15 18-6-6 6-6" />
+      </svg>
+      <span>กลับหน้าหลัก</span>
+    </button>
 
     <div class="login-language">
       <LanguageToggle />
@@ -254,6 +265,54 @@ function acknowledgePinPopup() {
   inset-block-start: max(0.75rem, env(safe-area-inset-top));
   inset-inline-end: max(0.75rem, env(safe-area-inset-right));
   color: var(--text-primary);
+}
+
+.home-link {
+  position: fixed;
+  z-index: 10;
+  inset-block-start: max(0.75rem, env(safe-area-inset-top));
+  inset-inline-start: max(0.75rem, env(safe-area-inset-left));
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 2.15rem;
+  padding: 0.35rem 0.75rem 0.35rem 0.55rem;
+  border: 0;
+  border-radius: 0.6rem;
+  background: var(--bg-surface, #fff);
+  color: var(--brand-primary, #17479e);
+  box-shadow: 0 4px 14px rgb(15 23 42 / 0.18);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 650;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.home-link svg {
+  width: 1rem;
+  height: 1rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.home-link:hover {
+  background: #eff6ff;
+  box-shadow: 0 6px 18px rgb(15 23 42 / 0.22);
+  transform: translateY(-1px);
+}
+
+.home-link:focus-visible {
+  outline: 3px solid rgb(255 255 255 / 0.55);
+  outline-offset: 3px;
+}
+
+.home-link:active {
+  transform: translateY(0);
 }
 
 .bg-grid {
@@ -448,5 +507,13 @@ function acknowledgePinPopup() {
   line-height: 1.4;
 }
 .pin-modal .btn { margin: 0 auto; }
+
+@media (max-width: 480px) {
+  .home-link {
+    min-height: 2rem;
+    padding: 0.3rem 0.6rem 0.3rem 0.45rem;
+    font-size: 0.74rem;
+  }
+}
 
 </style>

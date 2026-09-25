@@ -7,7 +7,7 @@ import BookingDesktop from '../views/components/BookingDesktop.vue'
 import { useUserStore } from '../stores/user'
 import { locale } from '../i18n'
 
-const logo = '/icons/icon-192.svg'
+const logo = '/icons/logo.png'
 
 const router = useRouter()
 const route = useRoute()
@@ -82,7 +82,7 @@ function handleAuthAction() {
   <div class="other-layout">
     <header class="topbar">
       <div class="brand">
-        <img :src="logo" alt="Logo" class="brand-logo" />
+        <img :src="logo" alt="ตราสัญลักษณ์ระบบ" class="brand-logo" />
         <span class="brand-title">ระบบบริหารจัดการห้องคอมพิวเตอร์สำนักคอมพิวเตอร์</span>
       </div>
 
@@ -177,10 +177,11 @@ function handleAuthAction() {
 }
 
 .brand-logo {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  object-fit: cover;
+  display: block;
+  width: 38px;
+  height: 38px;
+  object-fit: contain;
+  object-position: center;
   flex-shrink: 0;
 }
 
