@@ -5,6 +5,7 @@ import ThemeToggle from '../views/components/ThemeToggle.vue'
 import LanguageToggle from '../views/components/LanguageToggle.vue'
 import BookingDesktop from '../views/components/BookingDesktop.vue'
 import { useUserStore } from '../stores/user'
+import { locale } from '../i18n'
 
 const logo = '/icons/icon-192.svg'
 
@@ -54,7 +55,10 @@ const menuItems = [
 ]
 
 const visibleMenuItems = computed(() => userStore.isLoggedIn ? menuItems : [])
-const authActionLabel = computed(() => (userStore.isLoggedIn ? 'Logout' : 'Login'))
+const authActionLabel = computed(() => {
+  if (locale.value === 'th') return userStore.isLoggedIn ? 'ออกจากระบบ' : 'เข้าสู่ระบบ'
+  return userStore.isLoggedIn ? 'Logout' : 'Login'
+})
 
 function isActive(path: string) {
   return route.path === path
