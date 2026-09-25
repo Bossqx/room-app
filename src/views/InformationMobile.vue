@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import DashboardTest4 from "./DashboardTest4.vue";
+import HomeDashboard from "./HomeDashboard.vue";
 </script>
 
 <template>
-  <DashboardTest4 />
+  <HomeDashboard />
 </template>

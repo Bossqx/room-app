@@ -32,7 +32,7 @@ const DashboardTestLayout = () => import("../layouts/DashboardTestLayout.vue");
 const DashboardTest = () => import("../views/DashboardTest.vue");
 const DashboardTest2 = () => import("../views/DashboardTest2.vue");
 const DashboardTest3 = () => import("../views/DashboardTest3.vue");
-const DashboardTest4 = () => import("../views/DashboardTest4.vue");
+const HomeDashboard = () => import("../views/HomeDashboard.vue");
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -59,7 +59,7 @@ const router = createRouter({
         {
           path: "dashboard-first",
           name: "dashboard-first",
-          component: DashboardTest4,
+          component: HomeDashboard,
         },
       ],
     },
@@ -88,7 +88,7 @@ const router = createRouter({
       path: "/dashboard-test4",
       component: DashboardTestLayout,
       children: [
-        { path: "", name: "dashboard-test4", component: DashboardTest4 },
+        { path: "", name: "dashboard-test4", component: HomeDashboard },
       ],
     },
 
@@ -148,7 +148,7 @@ const router = createRouter({
         {
           path: "/desktop/overview",
           name: "/desktop/overview",
-          component: DashboardTest4,
+          component: HomeDashboard,
         },
       ],
     },

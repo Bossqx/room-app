@@ -288,4 +288,48 @@ function logout() {
   padding: 2.5rem 2rem 1.5rem;
   overflow-y: auto;
 }
+
+/* Keep admin pages usable on tablets and phones without letting the
+   navigation consume most of the viewport. */
+@media (max-width: 760px) {
+  .sidebar {
+    width: 84px;
+    padding: 0.75rem 0.45rem;
+    border-radius: 0 0.75rem 0.75rem 0;
+  }
+
+  .brand {
+    flex-direction: column;
+    gap: 0.55rem;
+    padding: 0.25rem 0 0.75rem;
+  }
+
+  .brand-title {
+    display: none;
+  }
+
+  .brand-actions {
+    flex-direction: column;
+  }
+
+  .menu-item {
+    justify-content: center;
+    padding: 0.65rem;
+  }
+
+  .menu-item > span,
+  .chevron {
+    display: none;
+  }
+
+  .submenu {
+    margin-top: 0.15rem;
+    padding-left: 0;
+    border-left: 0;
+  }
+
+  .container {
+    padding: 1.25rem 0.75rem;
+  }
+}
 </style>

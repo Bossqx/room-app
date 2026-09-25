@@ -24,6 +24,7 @@ const now = new Date()
 const selectedRange = ref<RangeKey>('week')
 const selectedYear = ref(now.getFullYear())
 const selectedMonth = ref(now.getMonth())
+const selectedUser = ref('')
 const rankingView = ref<'users' | 'rooms'>('users')
 const rankingDialog = ref<HTMLDialogElement | null>(null)
 const updatedAt = ref<Date | null>(null)
@@ -33,7 +34,7 @@ let statusLoadGeneration = 0
 
 const copy = computed(() => locale.value === 'th' ? {
   title: 'สถิติการใช้ห้อง', subtitle: 'วิเคราะห์ปริมาณการใช้งานและช่วงเวลาที่มีความต้องการสูง',
-  week: 'สัปดาห์นี้', month: 'รายเดือน', semester: 'ทั้งภาคเรียน', selectMonth: 'เลือกเดือน', selectYear: 'เลือกปี', refresh: 'รีเฟรช', updating: 'กำลังโหลด…', updated: 'อัปเดตล่าสุด',
+  week: 'สัปดาห์นี้', month: 'รายเดือน', semester: 'ทั้งภาคเรียน', selectMonth: 'เลือกเดือน', selectYear: 'เลือกปี', selectUser: 'เลือกผู้ใช้งาน', everyUser: 'ผู้ใช้งานทั้งหมด', refresh: 'รีเฟรช', updating: 'กำลังโหลด…', updated: 'อัปเดตล่าสุด',
   sessions: 'รายการจอง', hours: 'ชั่วโมงที่ถูกจอง', rooms: 'ห้องที่มีการใช้', utilization: 'อัตราการใช้ช่วงเปิดบริการ',
   sessionsUnit: 'รายการ', hoursUnit: 'ชม.', roomsUnit: 'ห้อง', trend: 'แนวโน้มการใช้ห้อง', trendHint: 'จำนวนรายการตามช่วงเวลาที่เลือก',
   ranked: 'ห้องที่ถูกใช้มากที่สุด', userRanked: 'ผู้ใช้งานสูงสุด', rankedHint: 'จัดอันดับจากจำนวนชั่วโมงที่ถูกจอง', userRankedHint: 'จัดอันดับจากจำนวนครั้งการจอง', room: 'ห้อง', users: 'ผู้ใช้งาน', share: 'สัดส่วน', viewAll: 'ดูอันดับทั้งหมด', allUsers: 'อันดับผู้ใช้งานทั้งหมด', allRooms: 'อันดับห้องทั้งหมด', rank: 'อันดับ', close: 'ปิด',
@@ -43,7 +44,7 @@ const copy = computed(() => locale.value === 'th' ? {
   currentSemester: 'ภาคการศึกษาปัจจุบัน', allSemester: 'ข้อมูลทั้งหมดในภาคเรียน', chartSessions: 'รายการ',
 } : {
   title: 'Room Usage Analytics', subtitle: 'Analyze usage volume and peak demand periods',
-  week: 'This week', month: 'Monthly', semester: 'Full semester', selectMonth: 'Select month', selectYear: 'Select year', refresh: 'Refresh', updating: 'Loading…', updated: 'Last updated',
+  week: 'This week', month: 'Monthly', semester: 'Full semester', selectMonth: 'Select month', selectYear: 'Select year', selectUser: 'Select user', everyUser: 'All users', refresh: 'Refresh', updating: 'Loading…', updated: 'Last updated',
   sessions: 'Bookings', hours: 'Booked hours', rooms: 'Active rooms', utilization: 'Open-hours utilization',
   sessionsUnit: 'entries', hoursUnit: 'hrs', roomsUnit: 'rooms', trend: 'Usage trend', trendHint: 'Bookings within the selected period',
   ranked: 'Most-used rooms', userRanked: 'Top users', rankedHint: 'Ranked by total booked hours', userRankedHint: 'Ranked by number of bookings', room: 'Room', users: 'Users', share: 'Share', viewAll: 'View all rankings', allUsers: 'All user rankings', allRooms: 'All room rankings', rank: 'Rank', close: 'Close',
@@ -85,10 +86,15 @@ const yearOptions = computed(() => {
   return [...years].sort((a, b) => b - a)
 })
 function selectCalendarMonth() { selectedRange.value = 'month' }
-const filteredSchedules = computed(() => schedules.value.filter(row => {
+const dateFilteredSchedules = computed(() => schedules.value.filter(row => {
   const date = parseDate(row.schedule_date)
   return date >= rangeBounds.value.start && date <= rangeBounds.value.end
 }))
+const userOptions = computed(() => [...new Set(dateFilteredSchedules.value.map(ownerName).filter(Boolean))]
+  .sort((a, b) => a.localeCompare(b, locale.value === 'th' ? 'th' : 'en', { sensitivity: 'base' })))
+const filteredSchedules = computed(() => selectedUser.value
+  ? dateFilteredSchedules.value.filter(row => ownerName(row) === selectedUser.value)
+  : dateFilteredSchedules.value)
 const totalHours = computed(() => filteredSchedules.value.reduce((sum, row) => sum + durationHours(row), 0))
 const activeRooms = computed(() => new Set(filteredSchedules.value.map(row => row.roomcode).filter(Boolean)).size)
 const calendarDays = computed(() => Math.max(1, Math.round((rangeBounds.value.end.getTime() - rangeBounds.value.start.getTime()) / 86_400_000) + 1))
@@ -113,6 +119,9 @@ function ownerName(row: ScheduleItem) {
   if (typeof row.teacher_name === 'string' && row.teacher_name.trim()) return row.teacher_name.trim()
   return row.user_name?.trim() || row.user_login?.trim() || ''
 }
+watch(userOptions, users => {
+  if (selectedUser.value && !users.includes(selectedUser.value)) selectedUser.value = ''
+})
 const userStats = computed<UserStat[]>(() => {
   const users = new Map<string, { sessions: number; hours: number }>()
   filteredSchedules.value.forEach(row => {
@@ -225,6 +234,7 @@ onMounted(() => { load(); semesterStore.fetchActiveSemester(API) })
           <button v-for="range in (['week','month','semester'] as RangeKey[])" :key="range" type="button" :class="{ active: selectedRange === range }" @click="selectedRange = range">{{ copy[range] }}</button>
         </div>
         <div class="date-filters">
+          <label class="user-filter"><span>{{ copy.selectUser }}</span><select v-model="selectedUser" :aria-label="copy.selectUser"><option value="">{{ copy.everyUser }}</option><option v-for="user in userOptions" :key="user" :value="user">{{ user }}</option></select></label>
           <label><span>{{ copy.selectMonth }}</span><select v-model.number="selectedMonth" @change="selectCalendarMonth"><option v-for="item in monthOptions" :key="item.value" :value="item.value">{{ item.label }}</option></select></label>
           <label><span>{{ copy.selectYear }}</span><select v-model.number="selectedYear" @change="selectCalendarMonth"><option v-for="year in yearOptions" :key="year" :value="year">{{ locale === 'th' ? year + 543 : year }}</option></select></label>
         </div>
@@ -310,12 +320,46 @@ onMounted(() => { load(); semesterStore.fetchActiveSemester(API) })
 
 <style scoped>
 /* Readability scale: approximately +2px across the analytics surface. */
-.date-filters{display:flex;gap:6px}.date-filters label{position:relative}.date-filters label>span{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}.date-filters select{height:35px;padding:0 27px 0 9px;border:1px solid var(--dashboard-border);border-radius:8px;background:var(--dashboard-surface);color:var(--dashboard-text);font:inherit;font-size:.78rem;cursor:pointer}.date-filters select:focus{border-color:var(--dashboard-accent)}
+.date-filters{display:flex;gap:6px}.date-filters label{position:relative;min-width:0}.date-filters label>span{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}.date-filters select{height:35px;max-width:100%;padding:0 27px 0 9px;border:1px solid var(--dashboard-border);border-radius:8px;background:var(--dashboard-surface);color:var(--dashboard-text);font:inherit;font-size:.78rem;cursor:pointer}.date-filters .user-filter select{width:190px}.date-filters select:focus{border-color:var(--dashboard-accent)}
 .usage-outcome-panel{display:flex;flex-direction:column}.outcome-grid{min-height:0;flex:1;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;padding:10px}.outcome-card{min-width:0;display:flex;flex-direction:column;justify-content:center;padding:10px;border:1px solid var(--dashboard-border-soft);border-radius:10px;background:var(--dashboard-surface-raised)}.outcome-card>span{display:flex;align-items:center;gap:5px;color:var(--dashboard-text-secondary);font-size:.68rem;white-space:nowrap}.outcome-card>span i{width:7px;height:7px;flex:0 0 7px;border-radius:50%;background:var(--dashboard-accent)}.outcome-card>strong{margin-top:5px;font-size:1.2rem;line-height:1;font-variant-numeric:tabular-nums}.outcome-card>small{margin-top:4px;color:var(--dashboard-text-muted);font-size:.58rem}.outcome-card.confirmed>span i{background:var(--status-free)}.outcome-card.cancelled>span i{background:var(--status-busy)}.outcome-card.no-show>span i{background:var(--status-unknown)}.outcome-card.pending>span i{background:var(--status-pending)}.outcome-grid.checking .outcome-card:not(.total){opacity:.72}
 .page-header h1{font-size:1.9rem}.page-header p{font-size:.92rem}.range-tabs button,.refresh{font-size:.82rem}.period-line{font-size:.77rem}.error{font-size:.82rem}.metric-strip span{font-size:.8rem}.metric-strip strong{font-size:1.68rem}.metric-strip small{font-size:.67rem}.panel h2{font-size:1rem}.panel header p{font-size:.71rem}.panel>header>strong{font-size:1.32rem}.panel>header>strong small{font-size:.67rem}.bar-value{font-size:.67rem}.trend-column small{font-size:.64rem}.range-month .trend-column small{font-size:.54rem}.rank-row>b{font-size:.7rem}.rank-detail strong{font-size:.8rem}.rank-detail span{font-size:.65rem}.rank-row>em{font-size:.7rem}.demand-row>div:first-child strong{font-size:.79rem}.demand-row>div:first-child small{font-size:.64rem}.demand-row>span strong{font-size:.84rem}.demand-row>span small{font-size:.62rem}.insights-panel dt{font-size:.67rem}.insights-panel dd{font-size:.84rem}.insights-panel dd small{font-size:.64rem}.empty-state{font-size:.88rem}.ranking-tabs button{font-size:.67rem}.view-all{font-size:.68rem}.ranking-dialog h2{font-size:1.12rem}.ranking-dialog header p{font-size:.77rem}.ranking-dialog th{font-size:.77rem}.ranking-dialog td{font-size:.78rem}.ranking-dialog td:first-child b{font-size:.7rem}.ranking-dialog>footer button{font-size:.77rem}
-@media(max-width:760px){.date-filters{width:100%}.date-filters label{flex:1}.date-filters select{width:100%}.outcome-grid{grid-template-columns:repeat(2,1fr)}.outcome-card.total{grid-column:1/-1}}
+@media(max-width:760px){.date-filters{width:100%}.date-filters label{flex:1}.date-filters .user-filter{flex:1.5}.date-filters select,.date-filters .user-filter select{width:100%}.outcome-grid{grid-template-columns:repeat(2,1fr)}.outcome-card.total{grid-column:1/-1}}
 </style>
 
 <style scoped>
 .ranking-actions{display:flex;align-items:center;gap:7px}.ranking-tabs{display:flex;padding:2px;border:1px solid var(--dashboard-border);border-radius:7px;background:var(--dashboard-surface-muted)}.ranking-tabs button{padding:4px 7px;border:0;border-radius:5px;background:transparent;color:var(--dashboard-text-secondary);font:inherit;font-size:.67rem;cursor:pointer}.ranking-tabs button.active{background:var(--dashboard-surface);color:var(--dashboard-accent);font-weight:600}.view-all{padding:5px 7px;border:0;background:transparent;color:var(--dashboard-accent);font:inherit;font-size:.68rem;font-weight:600;cursor:pointer;text-decoration:underline;text-underline-offset:3px}.rank-detail strong{max-width:48%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ranking-dialog{width:min(760px,calc(100vw - 32px));max-height:min(78vh,680px);padding:0;border:1px solid var(--dashboard-border);border-radius:14px;background:var(--dashboard-surface);color:var(--dashboard-text);box-shadow:0 24px 70px rgb(15 23 42/.3);font-family:'Kanit',sans-serif}.ranking-dialog::backdrop{background:rgb(15 23 42/.5)}.ranking-dialog>header{display:flex;align-items:center;justify-content:space-between;padding:15px 18px;border-bottom:1px solid var(--dashboard-border)}.ranking-dialog h2{margin:0;font-size:1.12rem}.ranking-dialog header p{margin:2px 0 0;color:var(--dashboard-text-muted);font-size:.77rem}.ranking-dialog header button{width:30px;height:30px;display:grid;place-items:center;border:1px solid var(--dashboard-border);border-radius:8px;background:var(--dashboard-surface-muted);color:var(--dashboard-text);cursor:pointer}.ranking-dialog header svg{width:15px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round}.all-ranking-table-wrap{max-height:55vh;overflow:auto}.ranking-dialog table{width:100%;border-collapse:collapse}.ranking-dialog th{position:sticky;top:0;padding:9px 12px;background:var(--dashboard-surface-muted);color:var(--dashboard-text-secondary);font-size:.77rem;font-weight:600;text-align:left}.ranking-dialog td{padding:9px 12px;border-bottom:1px solid var(--dashboard-border-soft);font-size:.78rem}.ranking-dialog th:first-child,.ranking-dialog td:first-child{width:54px;text-align:center}.ranking-dialog th:nth-child(n+3),.ranking-dialog td:nth-child(n+3){text-align:right}.ranking-dialog td:first-child b{width:22px;height:22px;display:inline-grid;place-items:center;border-radius:6px;background:var(--dashboard-accent-soft);color:var(--dashboard-accent);font-size:.7rem}.ranking-dialog tbody tr:nth-child(even){background:color-mix(in srgb,var(--dashboard-surface-muted) 42%,transparent)}.ranking-dialog>footer{display:flex;justify-content:flex-end;padding:10px 14px;border-top:1px solid var(--dashboard-border)}.ranking-dialog>footer button{padding:7px 14px;border:0;border-radius:8px;background:var(--dashboard-accent);color:var(--brand-on-primary);font:inherit;font-size:.77rem;font-weight:600;cursor:pointer}@media(max-width:760px){.ranking-panel>header{align-items:flex-start;flex-direction:column}.ranking-actions{width:100%;justify-content:space-between}.ranking-dialog th:nth-child(4),.ranking-dialog td:nth-child(4){display:none}.ranking-dialog th,.ranking-dialog td{padding-inline:8px}}
+</style>
+
+<style scoped>
+/* Visual polish pass for the analytics workspace. */
+.analytics-dashboard{gap:14px}.page-header{min-height:74px}.page-header h1{font-size:2.15rem;letter-spacing:-.035em}.page-header p{max-width:560px;margin-top:6px;color:var(--dashboard-text-secondary);font-size:.9rem}.header-controls{align-self:flex-start;padding-top:5px}.range-tabs{padding:4px;border-color:var(--dashboard-border-soft);box-shadow:0 3px 10px rgb(15 23 42/.05)}.range-tabs button{min-height:36px;padding-inline:14px}.range-tabs button.active{box-shadow:0 3px 8px color-mix(in srgb,var(--dashboard-accent) 26%,transparent)}.date-filters select,.refresh{height:44px;min-height:44px}.date-filters select{padding-inline:12px 32px;box-shadow:0 3px 10px rgb(15 23 42/.04)}.refresh{padding-inline:14px;box-shadow:0 3px 10px rgb(15 23 42/.04)}.period-line{padding-inline:2px}.metric-strip{overflow:hidden;border:0;box-shadow:0 7px 22px rgb(15 23 42/.08)}.metric-strip>div{min-height:72px;padding:15px 20px}.metric-strip>div+div:before{top:16px;bottom:16px}.metric-strip span{font-weight:500}.metric-strip strong{margin-top:5px;font-size:1.85rem}.metric-strip small{margin-top:5px}.analytics-grid{grid-template-columns:minmax(0,1.55fr) minmax(390px,.85fr);grid-template-rows:minmax(0,1fr) minmax(210px,.72fr);gap:14px}.panel{border:0;box-shadow:0 7px 22px rgb(15 23 42/.07)}.panel>header{min-height:61px;padding:11px 17px;border-color:var(--dashboard-border-soft)}.panel h2{font-size:1.08rem;letter-spacing:-.015em}.panel header p{margin-top:3px;font-size:.72rem}.panel>header>strong{font-size:1.45rem}.trend-chart{position:relative;gap:12px;padding:24px 20px 12px;background-image:repeating-linear-gradient(to top,transparent 0,transparent calc(25% - 1px),color-mix(in srgb,var(--dashboard-border) 46%,transparent) 25%);background-size:100% 100%}.trend-column{grid-template-rows:20px minmax(80px,1fr) 22px}.bar-value{font-size:.72rem;font-weight:600}.bar-track{border-bottom-color:var(--dashboard-border-muted)}.bar-track i{width:min(46px,70%);border-radius:7px 7px 2px 2px;background:var(--dashboard-accent);box-shadow:0 5px 12px color-mix(in srgb,var(--dashboard-accent) 22%,transparent)}.trend-column:hover .bar-track i{background:var(--dashboard-accent-strong)}.trend-column small{padding-top:7px;font-size:.66rem}.ranking-list{padding:4px 16px 8px}.rank-row{grid-template-columns:28px minmax(0,1fr) 50px;gap:10px;padding:10px 0}.rank-row>b{width:24px;height:24px;border-radius:7px;font-size:.7rem}.rank-detail strong{max-width:52%;font-size:.82rem}.rank-detail span{font-size:.66rem}.rank-track{height:5px;margin-top:7px}.rank-track i{background:var(--dashboard-accent)}.rank-row>em{font-size:.7rem;font-weight:600}.view-all{padding:7px 4px;font-size:.72rem}.usage-outcome-panel>header{min-height:56px}.outcome-grid{gap:10px;padding:12px}.outcome-card{min-height:94px;padding:13px 14px;border:0;background:var(--dashboard-surface-muted)}.outcome-card.total{background:var(--dashboard-accent-soft)}.outcome-card.confirmed{background:var(--status-free-soft)}.outcome-card.cancelled{background:var(--status-busy-soft)}.outcome-card.no-show{background:var(--status-unknown-soft)}.outcome-card.pending{background:var(--status-pending-soft)}.outcome-card>span{font-size:.72rem;font-weight:500}.outcome-card>span i{width:8px;height:8px;flex-basis:8px}.outcome-card>strong{margin-top:9px;font-size:1.5rem}.outcome-card>small{margin-top:5px;font-size:.65rem}.room-ranking-panel .ranking-list{padding-bottom:10px}
+@media(max-width:1350px){.analytics-grid{grid-template-columns:minmax(0,1.35fr) minmax(350px,.9fr)}.header-controls{flex-wrap:wrap;justify-content:flex-end}.outcome-grid{grid-template-columns:repeat(3,1fr)}.outcome-card.total{grid-row:span 2}.analytics-dashboard{height:auto}}
+@media(max-width:760px){.page-header h1{font-size:1.8rem}.header-controls{padding-top:0}.date-filters select,.refresh{height:40px;min-height:40px}.metric-strip>div{min-height:78px;padding:14px}.analytics-grid{grid-template-columns:minmax(0,1fr);grid-template-rows:320px auto auto auto}.trend-chart{padding-inline:10px;gap:4px}.bar-track i{width:min(34px,70%)}.outcome-grid{grid-template-columns:repeat(2,1fr)}.outcome-card.total{grid-row:auto;grid-column:1/-1}}
+@media(max-width:480px){
+  .analytics-dashboard,.page-header,.page-header>div,.header-controls,.range-tabs,.date-filters,.metric-strip,.analytics-grid{min-width:0;max-width:100%}
+  .page-header{min-height:0;gap:14px}
+  .page-header h1{font-size:1.55rem;line-height:1.25;white-space:normal}
+  .page-header p{font-size:.78rem;line-height:1.5}
+  .header-controls{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;width:100%}
+  .range-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));width:100%;box-sizing:border-box}
+  .range-tabs button{min-width:0;min-height:34px;padding-inline:4px;font-size:.68rem;white-space:nowrap}
+  .date-filters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%}
+  .date-filters label,.date-filters select{min-width:0;width:100%}
+  .date-filters .user-filter{grid-column:1/-1}
+  .refresh{width:100%;justify-content:center}
+  .period-line{align-items:flex-start;flex-direction:column;gap:3px}
+  .metric-strip>div{min-width:0;padding:12px 10px}
+  .metric-strip span{font-size:.72rem;line-height:1.35}
+  .metric-strip strong{font-size:1.52rem}
+  .metric-strip small{font-size:.61rem;line-height:1.35}
+  .panel>header{gap:8px;padding-inline:12px}
+  .panel h2{font-size:.96rem}
+  .panel header p{font-size:.66rem;line-height:1.4}
+  .ranking-list{padding-inline:12px}
+  .rank-row{grid-template-columns:26px minmax(0,1fr) 44px;gap:7px}
+  .rank-detail strong{max-width:55%;font-size:.75rem}
+  .rank-detail span{font-size:.6rem}
+  .outcome-grid{gap:7px;padding:9px}
+  .outcome-card{min-height:86px;padding:11px}
+}
 </style>
