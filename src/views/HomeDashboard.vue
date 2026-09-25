@@ -153,6 +153,48 @@ let clockTimer: ReturnType<typeof setInterval> | null = null;
 let dashboardRefreshTimer: ReturnType<typeof setInterval> | null = null;
 let personCountStream: EventSource | null = null;
 let detailRequestGeneration = 0;
+let initialViewportGuardActive = true;
+let initialViewportFrame: number | null = null;
+let initialViewportTimers: number[] = [];
+const previousScrollRestoration = typeof window !== "undefined" && "scrollRestoration" in window.history
+  ? window.history.scrollRestoration
+  : null;
+
+if (previousScrollRestoration !== null) {
+  window.history.scrollRestoration = "manual";
+}
+
+function markInitialViewportInteraction() {
+  initialViewportGuardActive = false;
+}
+
+function keepInitialViewportAtTop() {
+  if (!initialViewportGuardActive) return;
+  window.scrollTo({ left: 0, top: 0, behavior: "auto" });
+}
+
+async function finishInitialViewportReset() {
+  await nextTick();
+  keepInitialViewportAtTop();
+  initialViewportFrame = window.requestAnimationFrame(() => {
+    keepInitialViewportAtTop();
+    initialViewportFrame = window.requestAnimationFrame(() => {
+      keepInitialViewportAtTop();
+      initialViewportFrame = null;
+    });
+  });
+
+  // Mobile browsers can restore the old offset only after async content,
+  // fonts, and viewport chrome have settled. Keep a short, bounded guard so
+  // the schedule list cannot become the restored scroll anchor.
+  initialViewportTimers = [120, 400, 900, 1500].map((delay, index, delays) => window.setTimeout(() => {
+    keepInitialViewportAtTop();
+    if (index === delays.length - 1) {
+      initialViewportGuardActive = false;
+      initialViewportTimers = [];
+    }
+  }, delay));
+}
 
 function localDateKey(date: Date): string {
   const year = date.getFullYear();
@@ -794,14 +836,25 @@ watch(selectedRoomCode, (roomCode) => {
 });
 
 onMounted(() => {
+  window.addEventListener("touchstart", markInitialViewportInteraction, { passive: true });
+  window.addEventListener("wheel", markInitialViewportInteraction, { passive: true });
+  window.addEventListener("pointerdown", markInitialViewportInteraction, { passive: true });
+  keepInitialViewportAtTop();
   selectToday();
-  loadCoreData();
+  void loadCoreData().finally(finishInitialViewportReset);
   subscribePersonCount();
   clockTimer = setInterval(() => { now.value = new Date(); }, 1000);
   dashboardRefreshTimer = setInterval(() => loadCoreData(false), 5 * 60_000);
 });
 
 onUnmounted(() => {
+  window.removeEventListener("touchstart", markInitialViewportInteraction);
+  window.removeEventListener("wheel", markInitialViewportInteraction);
+  window.removeEventListener("pointerdown", markInitialViewportInteraction);
+  if (initialViewportFrame !== null) window.cancelAnimationFrame(initialViewportFrame);
+  initialViewportTimers.forEach((timer) => window.clearTimeout(timer));
+  initialViewportTimers = [];
+  if (previousScrollRestoration !== null) window.history.scrollRestoration = previousScrollRestoration;
   if (clockTimer) clearInterval(clockTimer);
   if (dashboardRefreshTimer) clearInterval(dashboardRefreshTimer);
   personCountStream?.close();
@@ -1506,6 +1559,7 @@ onUnmounted(() => {
   padding: 0.52rem 35px;
   box-sizing: border-box;
   overflow: visible;
+  overflow-anchor: none;
   background: var(--dt-page);
   color: var(--dt-text);
   font-size: 14px;

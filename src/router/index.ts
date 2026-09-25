@@ -36,6 +36,14 @@ const HomeDashboard = () => import("../views/HomeDashboard.vue");
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
+  scrollBehavior(to, _from, savedPosition) {
+    // The public dashboard must always open from its header. Mobile Safari
+    // otherwise restores the previous page offset after reload/PWA launch.
+    if (to.path === "/" || to.path === "/dashboard-first") {
+      return { left: 0, top: 0 };
+    }
+    return savedPosition ?? { left: 0, top: 0 };
+  },
   routes: [
     { path: "/qr-front", name: "display", component: DisplayView },
     { path: "/confirm", name: "confirm", component: ConfirmSchedule },

@@ -370,7 +370,14 @@ function handleAuthAction() {
 }
 
 @media (max-width: 640px) {
-  .topbar { flex-wrap: wrap; gap: 0.75rem; padding: 0.65rem 0.85rem; }
+  .topbar {
+    position: static;
+    top: auto;
+    z-index: auto;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    padding: 0.65rem 0.85rem;
+  }
   .brand { flex: 1 1 min(100%, 18rem); }
   .brand-title { white-space: normal; }
   .menu {
